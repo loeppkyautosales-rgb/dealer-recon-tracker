@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { statuses } from '../lib/statuses';
 import Column from './Column';
 import AddVehicle from './AddVehicle';
 import SearchBar from './SearchBar';
+import { getCurrentUser, signOut } from '../lib/auth';
 
 const initialVehicles = [
   { id: '1', vin: '1HGBH41JXMN109186', make: 'Honda', model: 'Civic', year: '2015', status: 'Queued' },
@@ -15,6 +16,29 @@ const initialVehicles = [
 export default function Board() {
   const [vehicles, setVehicles] = useState(initialVehicles);
   const [searchText, setSearchText] = useState('');
+  const [user, setUser] = useState(null);
+  const [loadingUser, setLoadingUser] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const initAuth = async () => {
+      try {
+        const currentUser = await getCurrentUser();
+        if (isMounted) setUser(currentUser);
+      } catch (err) {
+        console.error('Auth check failed', err);
+      } finally {
+        if (isMounted) setLoadingUser(false);
+      }
+    };
+
+    initAuth();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const filtered = useMemo(() => {
     const term = searchText.trim().toLowerCase();
@@ -46,8 +70,39 @@ export default function Board() {
     }));
   };
 
+  const onSignOut = async () => {
+    await signOut();
+    setUser(null);
+  };
+
+  if (loadingUser) {
+    return <p>Checking login status...</p>;
+  }
+
+  if (!user) {
+    return (
+      <section style={{ marginTop: '1rem', border: '1px solid #d1d5db', borderRadius: '0.8rem', padding: '1rem', background: '#fff' }}>
+        <h2>Authentication required</h2>
+        <p>You must log in to view and edit the Recon Board.</p>
+        <a href="/login" style={{ color: '#0b76f6', textDecoration: 'none', fontWeight: 600 }}>
+          Go to Login
+        </a>
+      </section>
+    );
+  }
+
   return (
     <section style={{ marginTop: '1rem' }}>
+      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontSize: '0.95rem', color: '#111827' }}>Logged in as {user.email}</span>
+        <button
+          onClick={onSignOut}
+          style={{ padding: '0.4rem 0.8rem', borderRadius: '0.35rem', border: '1px solid #9ca3af', background: '#f3f4f6' }}
+        >
+          Logout
+        </button>
+      </div>
+
       <AddVehicle onAdd={handleAdd} />
       <SearchBar value={searchText} onChange={setSearchText} />
       <div
