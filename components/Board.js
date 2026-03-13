@@ -5,26 +5,21 @@ import { statuses } from '../lib/statuses';
 import Column from './Column';
 import AddVehicle from './AddVehicle';
 import SearchBar from './SearchBar';
-import UserManagement from './UserManagement';
-import AuditLog from './AuditLog';
-import AnalyticsDashboard from './AnalyticsDashboard';
 import { getCurrentUser, signOut } from '../lib/auth';
 
-const initialVehicles = [
-  { id: '1', vin: '1HGBH41JXMN109186', make: 'Honda', model: 'Civic', year: '2015', status: 'Queued' },
-  { id: '2', vin: '2FTRX18W1XCA01234', make: 'Ford', model: 'F-150', year: '2018', status: 'In Progress' },
-  { id: '3', vin: '5NPE24AF0FH101234', make: 'Hyundai', model: 'Sonata', year: '2017', status: 'Complete' },
-];
+const initialVehicles = [];
 
 export default function Board() {
   const [vehicles, setVehicles] = useState(initialVehicles);
   const [searchText, setSearchText] = useState('');
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
-  const [auditEvents, setAuditEvents] = useState([]);
   const [users, setUsers] = useState([
-    { id: 'u1', email: 'admin@loeppky.com', role: 'manager' },
-    { id: 'u2', email: 'staff@loeppky.com', role: 'user' },
+    { id: 'u1', email: 'buddy@loeppkyauto.ca', role: 'manager' },
+    { id: 'u2', email: 'chris@loeppkyauto.ca', role: 'manager' },
+    { id: 'u3', email: 'loeppky22@gmail.com', role: 'manager' },
+    { id: 'u4', email: 'vinceloeppky@hotmail.com', role: 'manager' },
+    { id: 'u5', email: 'loeppky2001@protonmail.com', role: 'manager' },
   ]);
 
   useEffect(() => {
@@ -65,15 +60,9 @@ export default function Board() {
     return localUser?.role === 'manager';
   }, [user, users]);
 
-  const appendAudit = (action, vehicle) => {
-    const actor = user?.email || 'unknown';
-    setAuditEvents((prev) => [{ action, vehicle, actor, time: new Date().toISOString(), vin: vehicle.vin }, ...prev]);
-  };
-
   const handleAdd = (newVehicle) => {
     const newItem = { ...newVehicle, id: crypto.randomUUID() };
     setVehicles((prev) => [newItem, ...prev]);
-    appendAudit('added', newItem);
   };
 
   const handleDragStart = (event, vehicleId) => {
@@ -83,23 +72,14 @@ export default function Board() {
   const handleDrop = (event, targetStatus) => {
     event.preventDefault();
     const id = event.dataTransfer.getData('text/plain');
-    setVehicles((prev) => prev.map((v) => {
-      if (v.id === id) {
-        const updated = { ...v, status: targetStatus };
-        appendAudit(`moved to ${targetStatus}`, updated);
-        return updated;
-      }
-      return v;
-    }));
+    setVehicles((prev) => prev.map((v) => (v.id === id ? { ...v, status: targetStatus } : v)));
   };
 
   const handleNext = (id) => {
     setVehicles((prev) => prev.map((v) => {
       const index = statuses.indexOf(v.status);
       if (v.id !== id || index === -1 || index === statuses.length - 1) return v;
-      const updated = { ...v, status: statuses[index + 1] };
-      appendAudit('advanced', updated);
-      return updated;
+      return { ...v, status: statuses[index + 1] };
     }));
   };
 
@@ -107,17 +87,7 @@ export default function Board() {
     if (!isManager) {
       return;
     }
-    setVehicles((prev) => {
-      const vehicle = prev.find((v) => v.id === id);
-      if (vehicle) {
-        appendAudit('deleted', vehicle);
-      }
-      return prev.filter((v) => v.id !== id);
-    });
-  };
-
-  const onRoleUpdate = (userId, newRole) => {
-    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
+    setVehicles((prev) => prev.filter((v) => v.id !== id));
   };
 
   const onSignOut = async () => {
@@ -147,16 +117,24 @@ export default function Board() {
         <span style={{ fontSize: '0.95rem', color: '#111827' }}>
           Logged in as {user.email} ({isManager ? 'Manager' : 'User'})
         </span>
-        <button
-          onClick={onSignOut}
-          style={{ padding: '0.4rem 0.8rem', borderRadius: '0.35rem', border: '1px solid #9ca3af', background: '#f3f4f6' }}
-        >
-          Logout
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          {isManager && (
+            <a href="/manager" style={{ textDecoration: 'none' }}>
+              <button style={{ padding: '0.4rem 0.8rem', borderRadius: '0.35rem', border: '1px solid #0b76f6', background: '#0b76f6', color: '#fff' }}>
+                Manager Panel
+              </button>
+            </a>
+          )}
+          <button
+            onClick={onSignOut}
+            style={{ padding: '0.4rem 0.8rem', borderRadius: '0.35rem', border: '1px solid #9ca3af', background: '#f3f4f6' }}
+          >
+            Logout
+          </button>
+        </div>
       </div>
 
-      <AnalyticsDashboard vehicles={vehicles} />
-      <AddVehicle onAdd={handleAdd} />
+      {isManager && <AddVehicle onAdd={handleAdd} />}
       <SearchBar value={searchText} onChange={setSearchText} />
 
       <div
@@ -182,9 +160,6 @@ export default function Board() {
           );
         })}
       </div>
-
-      <AuditLog entries={auditEvents} />
-      {isManager && <UserManagement users={users} onRoleUpdate={onRoleUpdate} />}
     </section>
   );
 }

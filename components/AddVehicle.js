@@ -9,7 +9,7 @@ export default function AddVehicle({ onAdd }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!vin.trim()) return;
-    onAdd({ vin: vin.toUpperCase(), make, model, year, status: 'Queued' });
+    onAdd({ vin: vin.toUpperCase(), make, model, year, status: 'New Arrivals' });
     setVin('');
     setMake('');
     setModel('');
