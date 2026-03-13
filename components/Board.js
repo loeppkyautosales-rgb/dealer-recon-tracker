@@ -5,6 +5,9 @@ import { statuses } from '../lib/statuses';
 import Column from './Column';
 import AddVehicle from './AddVehicle';
 import SearchBar from './SearchBar';
+import UserManagement from './UserManagement';
+import AuditLog from './AuditLog';
+import AnalyticsDashboard from './AnalyticsDashboard';
 import { getCurrentUser, signOut } from '../lib/auth';
 
 const initialVehicles = [
@@ -18,6 +21,11 @@ export default function Board() {
   const [searchText, setSearchText] = useState('');
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
+  const [auditEvents, setAuditEvents] = useState([]);
+  const [users, setUsers] = useState([
+    { id: 'u1', email: 'admin@loeppky.com', role: 'manager' },
+    { id: 'u2', email: 'staff@loeppky.com', role: 'user' },
+  ]);
 
   useEffect(() => {
     let isMounted = true;
@@ -48,8 +56,24 @@ export default function Board() {
     );
   }, [searchText, vehicles]);
 
+  const isManager = useMemo(() => {
+    if (!user) return false;
+    const role = user.app_metadata?.role || user.user_metadata?.role || user.role || 'user';
+    if (role === 'manager') return true;
+
+    const localUser = users.find((u) => u.email === user.email || u.id === user.id);
+    return localUser?.role === 'manager';
+  }, [user, users]);
+
+  const appendAudit = (action, vehicle) => {
+    const actor = user?.email || 'unknown';
+    setAuditEvents((prev) => [{ action, vehicle, actor, time: new Date().toISOString(), vin: vehicle.vin }, ...prev]);
+  };
+
   const handleAdd = (newVehicle) => {
-    setVehicles((prev) => [{ ...newVehicle, id: crypto.randomUUID() }, ...prev]);
+    const newItem = { ...newVehicle, id: crypto.randomUUID() };
+    setVehicles((prev) => [newItem, ...prev]);
+    appendAudit('added', newItem);
   };
 
   const handleDragStart = (event, vehicleId) => {
@@ -59,15 +83,41 @@ export default function Board() {
   const handleDrop = (event, targetStatus) => {
     event.preventDefault();
     const id = event.dataTransfer.getData('text/plain');
-    setVehicles((prev) => prev.map((v) => (v.id === id ? { ...v, status: targetStatus } : v)));
+    setVehicles((prev) => prev.map((v) => {
+      if (v.id === id) {
+        const updated = { ...v, status: targetStatus };
+        appendAudit(`moved to ${targetStatus}`, updated);
+        return updated;
+      }
+      return v;
+    }));
   };
 
   const handleNext = (id) => {
     setVehicles((prev) => prev.map((v) => {
       const index = statuses.indexOf(v.status);
       if (v.id !== id || index === -1 || index === statuses.length - 1) return v;
-      return { ...v, status: statuses[index + 1] };
+      const updated = { ...v, status: statuses[index + 1] };
+      appendAudit('advanced', updated);
+      return updated;
     }));
+  };
+
+  const handleDelete = (id) => {
+    if (!isManager) {
+      return;
+    }
+    setVehicles((prev) => {
+      const vehicle = prev.find((v) => v.id === id);
+      if (vehicle) {
+        appendAudit('deleted', vehicle);
+      }
+      return prev.filter((v) => v.id !== id);
+    });
+  };
+
+  const onRoleUpdate = (userId, newRole) => {
+    setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
   };
 
   const onSignOut = async () => {
@@ -94,7 +144,9 @@ export default function Board() {
   return (
     <section style={{ marginTop: '1rem' }}>
       <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '0.95rem', color: '#111827' }}>Logged in as {user.email}</span>
+        <span style={{ fontSize: '0.95rem', color: '#111827' }}>
+          Logged in as {user.email} ({isManager ? 'Manager' : 'User'})
+        </span>
         <button
           onClick={onSignOut}
           style={{ padding: '0.4rem 0.8rem', borderRadius: '0.35rem', border: '1px solid #9ca3af', background: '#f3f4f6' }}
@@ -103,8 +155,10 @@ export default function Board() {
         </button>
       </div>
 
+      <AnalyticsDashboard vehicles={vehicles} />
       <AddVehicle onAdd={handleAdd} />
       <SearchBar value={searchText} onChange={setSearchText} />
+
       <div
         className="grid"
         style={{
@@ -123,10 +177,14 @@ export default function Board() {
               onDrop={handleDrop}
               onDragStart={handleDragStart}
               onNext={handleNext}
+              onDelete={isManager ? handleDelete : null}
             />
           );
         })}
       </div>
+
+      <AuditLog entries={auditEvents} />
+      {isManager && <UserManagement users={users} onRoleUpdate={onRoleUpdate} />}
     </section>
   );
 }

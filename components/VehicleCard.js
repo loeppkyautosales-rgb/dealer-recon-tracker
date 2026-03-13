@@ -1,4 +1,4 @@
-export default function VehicleCard({ vehicle, onDragStart, onAction }) {
+export default function VehicleCard({ vehicle, onDragStart, onAction, onDelete }) {
   return (
     <article
       draggable
@@ -19,14 +19,24 @@ export default function VehicleCard({ vehicle, onDragStart, onAction }) {
         {vehicle.make} {vehicle.model}
       </p>
       <small style={{ color: '#6b7280' }}>Status: {vehicle.status}</small>
-      {onAction && (
-        <button
-          onClick={() => onAction(vehicle.id)}
-          style={{ marginTop: '0.5rem', width: '100%', border: '1px solid #0b76f6', background: '#0b76f6', color: 'white', padding: '0.4rem', borderRadius: '0.3rem' }}
-        >
-          Next Stage
-        </button>
-      )}
+      <div style={{ marginTop: '0.5rem', display: 'grid', gap: '0.3rem' }}>
+        {onAction && (
+          <button
+            onClick={() => onAction(vehicle.id)}
+            style={{ width: '100%', border: '1px solid #0b76f6', background: '#0b76f6', color: 'white', padding: '0.4rem', borderRadius: '0.3rem' }}
+          >
+            Next Stage
+          </button>
+        )}
+        {onDelete && (
+          <button
+            onClick={() => onDelete(vehicle.id)}
+            style={{ width: '100%', border: '1px solid #ef4444', background: '#ef4444', color: 'white', padding: '0.4rem', borderRadius: '0.3rem' }}
+          >
+            Delete (Manager)
+          </button>
+        )}
+      </div>
     </article>
   );
 }

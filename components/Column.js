@@ -1,6 +1,6 @@
 import VehicleCard from './VehicleCard';
 
-export default function Column({ status, vehicles, onDragOver, onDrop, onDragStart, onNext }) {
+export default function Column({ status, vehicles, onDragOver, onDrop, onDragStart, onNext, onDelete }) {
   return (
     <section
       onDragOver={onDragOver}
@@ -16,7 +16,13 @@ export default function Column({ status, vehicles, onDragOver, onDrop, onDragSta
       <div style={{ marginTop: '1rem' }}>
         {vehicles.length === 0 && <p style={{ color: '#6b7280' }}>No vehicles</p>}
         {vehicles.map((vehicle) => (
-          <VehicleCard key={vehicle.id} vehicle={vehicle} onDragStart={onDragStart} onAction={onNext ? onNext : null} />
+          <VehicleCard
+            key={vehicle.id}
+            vehicle={vehicle}
+            onDragStart={onDragStart}
+            onAction={onNext ? onNext : null}
+            onDelete={onDelete}
+          />
         ))}
       </div>
     </section>
