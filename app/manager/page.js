@@ -33,11 +33,22 @@ export default function ManagerPage() {
         router.push('/login');
         return;
       }
-      const role = currentUser.app_metadata?.role || currentUser.user_metadata?.role || 'user';
+
+      const roleFromAuth =
+        currentUser.app_metadata?.role ||
+        currentUser.user_metadata?.role ||
+        currentUser.role ||
+        'user';
+      const localUser = users.find(
+        (u) => u.email === currentUser.email || u.id === currentUser.id,
+      );
+      const role = roleFromAuth === 'user' && localUser?.role ? localUser.role : roleFromAuth;
+
       if (role !== 'manager') {
         router.push('/');
         return;
       }
+
       setUser(currentUser);
       setLoading(false);
     };
@@ -90,6 +101,7 @@ export default function ManagerPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
+              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Stock #</th>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>VIN</th>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>Make/Model</th>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>Status</th>
@@ -99,7 +111,8 @@ export default function ManagerPage() {
           <tbody>
             {vehicles.map((v) => (
               <tr key={v.id} style={{ borderTop: '1px solid #e5e7eb' }}>
-                <td style={{ padding: '0.5rem' }}>{v.vin}</td>
+                <td style={{ padding: '0.5rem' }}>{v.stockNumber || 'N/A'}</td>
+                <td style={{ padding: '0.5rem' }}>{v.vin || 'N/A'}</td>
                 <td style={{ padding: '0.5rem' }}>{v.make} {v.model}</td>
                 <td style={{ padding: '0.5rem' }}>{v.status}</td>
                 <td style={{ padding: '0.5rem' }}>

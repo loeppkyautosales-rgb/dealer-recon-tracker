@@ -12,11 +12,11 @@ export default function VehicleCard({ vehicle, onDragStart, onAction, onDelete }
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
-        <h3 style={{ margin: 0, fontSize: '1rem' }}>{vehicle.vin || 'Unknown VIN'}</h3>
+        <h3 style={{ margin: 0, fontSize: '1rem' }}>{vehicle.stockNumber || 'Unknown Stock #'}</h3>
         <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>{vehicle.year || 'N/A'}</span>
       </div>
       <p style={{ margin: '0.25rem 0', color: '#374151' }}>
-        {vehicle.make} {vehicle.model}
+        {vehicle.make} {vehicle.model} • {vehicle.vin ? `VIN: ${vehicle.vin}` : 'VIN: N/A'}
       </p>
       <small style={{ color: '#6b7280' }}>Status: {vehicle.status}</small>
       <div style={{ marginTop: '0.5rem', display: 'grid', gap: '0.3rem' }}>
