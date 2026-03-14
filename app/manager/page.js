@@ -75,7 +75,7 @@ export default function ManagerPage() {
       const localUser = users.find(
         (u) => u.email === currentUser.email || u.id === currentUser.id,
       );
-      const role = roleFromAuth === 'user' && localUser?.role ? localUser.role : roleFromAuth;
+      const role = localUser?.role || roleFromAuth;
 
       setDebugInfo({
         email: currentUser.email,
