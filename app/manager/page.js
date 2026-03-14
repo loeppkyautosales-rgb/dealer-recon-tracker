@@ -22,6 +22,8 @@ const initialVehicles = [];
 export default function ManagerPage() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isManager, setIsManager] = useState(false);
+  const [debugInfo, setDebugInfo] = useState({});
   const [vehicles, setVehicles] = useState(initialVehicles);
   const [auditEvents, setAuditEvents] = useState([]);
   const [users, setUsers] = useState(defaultUsers);
@@ -72,11 +74,14 @@ export default function ManagerPage() {
       );
       const role = roleFromAuth === 'user' && localUser?.role ? localUser.role : roleFromAuth;
 
-      if (role !== 'manager') {
-        router.push('/');
-        return;
-      }
+      setDebugInfo({
+        email: currentUser.email,
+        roleFromAuth,
+        localUser: localUser ? { email: localUser.email, role: localUser.role } : null,
+        finalRole: role,
+      });
 
+      setIsManager(role === 'manager');
       setUser(currentUser);
       setLoading(false);
     };
@@ -162,6 +167,27 @@ export default function ManagerPage() {
     return <p>Loading manager panel...</p>;
   }
 
+  if (!isManager) {
+    return (
+      <main className="container">
+        <h1>Manager Admin</h1>
+        <p>You do not have permission to access the manager panel.</p>
+        <section style={{ marginTop: '1rem', padding: '1rem', background: '#fff', borderRadius: '0.75rem', border: '1px solid #d1d5db' }}>
+          <h3>Debug Info</h3>
+          <ul style={{ listStyle: 'none', padding: 0 }}>
+            <li><strong>Email:</strong> {debugInfo.email || 'N/A'}</li>
+            <li><strong>Role from Auth:</strong> {debugInfo.roleFromAuth || 'N/A'}</li>
+            <li><strong>Local User Match:</strong> {debugInfo.localUser ? `${debugInfo.localUser.email} (${debugInfo.localUser.role})` : 'None'}</li>
+            <li><strong>Final Role:</strong> {debugInfo.finalRole || 'N/A'}</li>
+          </ul>
+        </section>
+        <p>
+          <Link href="/">Back to Board</Link>
+        </p>
+      </main>
+    );
+  }
+
   return (
     <main className="container">
       <h1>Manager Admin</h1>
@@ -218,6 +244,16 @@ export default function ManagerPage() {
       </section>
 
       <AuditLog entries={auditEvents} />
+
+      <section style={{ marginTop: '1rem', padding: '1rem', background: '#fff', borderRadius: '0.75rem', border: '1px solid #d1d5db' }}>
+        <h3>Debug Info</h3>
+        <ul style={{ listStyle: 'none', padding: 0 }}>
+          <li><strong>Email:</strong> {debugInfo.email || 'N/A'}</li>
+          <li><strong>Role from Auth:</strong> {debugInfo.roleFromAuth || 'N/A'}</li>
+          <li><strong>Local User Match:</strong> {debugInfo.localUser ? `${debugInfo.localUser.email} (${debugInfo.localUser.role})` : 'None'}</li>
+          <li><strong>Final Role:</strong> {debugInfo.finalRole || 'N/A'}</li>
+        </ul>
+      </section>
 
       <p style={{ marginTop: '1rem' }}>
         <Link href="/">Back to Board</Link>
