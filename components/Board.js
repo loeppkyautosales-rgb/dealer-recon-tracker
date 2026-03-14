@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { statuses } from '../lib/statuses';
+import { appendAuditEvent, loadVehicles, saveVehicles, STORAGE_KEYS } from '../lib/persistence';
 import Column from './Column';
 import AddVehicle from './AddVehicle';
 import SearchBar from './SearchBar';
@@ -21,6 +23,22 @@ export default function Board() {
     { id: 'u4', email: 'vinceloeppky@hotmail.com', role: 'manager' },
     { id: 'u5', email: 'loeppky2001@protonmail.com', role: 'manager' },
   ]);
+
+  useEffect(() => {
+    const stored = loadVehicles();
+    if (stored && stored.length) {
+      setVehicles(stored);
+    }
+
+    const handleStorage = (event) => {
+      if (event.key === STORAGE_KEYS.vehicles) {
+        setVehicles(loadVehicles());
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -47,7 +65,7 @@ export default function Board() {
     const term = searchText.trim().toLowerCase();
     if (!term) return vehicles;
     return vehicles.filter((v) =>
-      [v.vin, v.make, v.model, v.year, v.status].join(' ').toLowerCase().includes(term),
+      [v.stockNumber, v.make, v.model, v.year, v.status].join(' ').toLowerCase().includes(term),
     );
   }, [searchText, vehicles]);
 
@@ -62,7 +80,22 @@ export default function Board() {
 
   const handleAdd = (newVehicle) => {
     const newItem = { ...newVehicle, id: crypto.randomUUID() };
-    setVehicles((prev) => [newItem, ...prev]);
+    setVehicles((prev) => {
+      const next = [newItem, ...prev];
+      saveVehicles(next);
+      return next;
+    });
+
+    appendAuditEvent({
+      actor: user?.email || 'unknown',
+      action: 'created',
+      stockNumber: newItem.stockNumber,
+      year: newItem.year,
+      make: newItem.make,
+      model: newItem.model,
+      status: newItem.status,
+      time: new Date().toISOString(),
+    });
   };
 
   const handleDragStart = (event, vehicleId) => {
@@ -72,22 +105,78 @@ export default function Board() {
   const handleDrop = (event, targetStatus) => {
     event.preventDefault();
     const id = event.dataTransfer.getData('text/plain');
-    setVehicles((prev) => prev.map((v) => (v.id === id ? { ...v, status: targetStatus } : v)));
+
+    setVehicles((prev) => {
+      const next = prev.map((v) => {
+        if (v.id !== id) return v;
+        const from = v.status;
+        appendAuditEvent({
+          actor: user?.email || 'unknown',
+          action: `moved from ${from} to ${targetStatus}`,
+          stockNumber: v.stockNumber,
+          year: v.year,
+          make: v.make,
+          model: v.model,
+          status: targetStatus,
+          time: new Date().toISOString(),
+        });
+        return { ...v, status: targetStatus };
+      });
+      saveVehicles(next);
+      return next;
+    });
   };
 
   const handleNext = (id) => {
-    setVehicles((prev) => prev.map((v) => {
-      const index = statuses.indexOf(v.status);
-      if (v.id !== id || index === -1 || index === statuses.length - 1) return v;
-      return { ...v, status: statuses[index + 1] };
-    }));
+    setVehicles((prev) => {
+      const next = prev.map((v) => {
+        const index = statuses.indexOf(v.status);
+        if (v.id !== id || index === -1 || index === statuses.length - 1) return v;
+
+        const nextStatus = statuses[index + 1];
+        appendAuditEvent({
+          actor: user?.email || 'unknown',
+          action: `moved from ${v.status} to ${nextStatus}`,
+          stockNumber: v.stockNumber,
+          year: v.year,
+          make: v.make,
+          model: v.model,
+          status: nextStatus,
+          time: new Date().toISOString(),
+        });
+
+        return { ...v, status: nextStatus };
+      });
+      saveVehicles(next);
+      return next;
+    });
   };
 
   const handleDelete = (id) => {
     if (!isManager) {
       return;
     }
-    setVehicles((prev) => prev.filter((v) => v.id !== id));
+
+    setVehicles((prev) => {
+      const removed = prev.find((v) => v.id === id);
+      const next = prev.filter((v) => v.id !== id);
+      saveVehicles(next);
+
+      if (removed) {
+        appendAuditEvent({
+          actor: user?.email || 'unknown',
+          action: 'deleted',
+          stockNumber: removed.stockNumber,
+          year: removed.year,
+          make: removed.make,
+          model: removed.model,
+          status: removed.status,
+          time: new Date().toISOString(),
+        });
+      }
+
+      return next;
+    });
   };
 
   const onSignOut = async () => {
@@ -119,11 +208,11 @@ export default function Board() {
         </span>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           {isManager && (
-            <a href="/manager" style={{ textDecoration: 'none' }}>
+            <Link href="/manager" style={{ textDecoration: 'none' }}>
               <button style={{ padding: '0.4rem 0.8rem', borderRadius: '0.35rem', border: '1px solid #0b76f6', background: '#0b76f6', color: '#fff' }}>
                 Manager Panel
               </button>
-            </a>
+            </Link>
           )}
           <button
             onClick={onSignOut}

@@ -4,10 +4,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser } from '../../lib/auth';
-import { statuses } from '../../lib/statuses';
+import { STORAGE_KEYS, appendAuditEvent, loadAuditEvents, loadUsers, loadVehicles, saveUsers, saveVehicles } from '../../lib/persistence';
 import AddVehicle from '../../components/AddVehicle';
 import UserManagement from '../../components/UserManagement';
 import AuditLog from '../../components/AuditLog';
+
+const defaultUsers = [
+  { id: 'u1', email: 'buddy@loeppkyauto.ca', role: 'manager' },
+  { id: 'u2', email: 'chris@loeppkyauto.ca', role: 'manager' },
+  { id: 'u3', email: 'loeppky22@gmail.com', role: 'manager' },
+  { id: 'u4', email: 'vinceloeppky@hotmail.com', role: 'manager' },
+  { id: 'u5', email: 'loeppky2001@protonmail.com', role: 'manager' },
+];
 
 const initialVehicles = [];
 
@@ -16,15 +24,35 @@ export default function ManagerPage() {
   const [loading, setLoading] = useState(true);
   const [vehicles, setVehicles] = useState(initialVehicles);
   const [auditEvents, setAuditEvents] = useState([]);
-  const [users, setUsers] = useState([
-    { id: 'u1', email: 'buddy@loeppkyauto.ca', role: 'manager' },
-    { id: 'u2', email: 'chris@loeppkyauto.ca', role: 'manager' },
-    { id: 'u3', email: 'loeppky22@gmail.com', role: 'manager' },
-    { id: 'u4', email: 'vinceloeppky@hotmail.com', role: 'manager' },
-    { id: 'u5', email: 'loeppky2001@protonmail.com', role: 'manager' },
-  ]);
+  const [users, setUsers] = useState(defaultUsers);
 
   const router = useRouter();
+
+  useEffect(() => {
+    const storedUsers = loadUsers(defaultUsers);
+    setUsers(storedUsers);
+
+    const storedVehicles = loadVehicles();
+    if (storedVehicles.length) setVehicles(storedVehicles);
+
+    const storedAudit = loadAuditEvents();
+    if (storedAudit.length) setAuditEvents(storedAudit);
+
+    const handleStorage = (event) => {
+      if (event.key === STORAGE_KEYS.users) {
+        setUsers(loadUsers(defaultUsers));
+      }
+      if (event.key === STORAGE_KEYS.vehicles) {
+        setVehicles(loadVehicles());
+      }
+      if (event.key === STORAGE_KEYS.auditEvents) {
+        setAuditEvents(loadAuditEvents());
+      }
+    };
+
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -54,30 +82,78 @@ export default function ManagerPage() {
     };
 
     initAuth();
-  }, [router]);
+  }, [router, users]);
 
   const addAudit = (action, vehicle) => {
-    setAuditEvents((prev) => [{ actor: user?.email || 'unknown', action, vin: vehicle.vin, time: new Date().toISOString() }, ...prev]);
+    const entry = {
+      actor: user?.email || 'unknown',
+      action,
+      stockNumber: vehicle.stockNumber,
+      year: vehicle.year,
+      make: vehicle.make,
+      model: vehicle.model,
+      status: vehicle.status,
+      time: new Date().toISOString(),
+    };
+
+    setAuditEvents((prev) => [entry, ...prev]);
+    appendAuditEvent(entry);
   };
 
   const onAddVehicle = (vehicle) => {
     const newVehicle = { ...vehicle, id: crypto.randomUUID() };
-    setVehicles((prev) => [newVehicle, ...prev]);
+    setVehicles((prev) => {
+      const next = [newVehicle, ...prev];
+      saveVehicles(next);
+      return next;
+    });
     addAudit('created', newVehicle);
   };
 
   const onDeleteVehicle = (id) => {
     const target = vehicles.find((v) => v.id === id);
     if (!target) return;
-    setVehicles((prev) => prev.filter((v) => v.id !== id));
+    setVehicles((prev) => {
+      const next = prev.filter((v) => v.id !== id);
+      saveVehicles(next);
+      return next;
+    });
     addAudit('deleted', target);
+  };
+
+  const onUpdateUserRole = (id, newRole) => {
+    setUsers((prev) => {
+      const next = prev.map((u) => (u.id === id ? { ...u, role: newRole } : u));
+      saveUsers(next);
+      return next;
+    });
+  };
+
+  const onAddUser = ({ email, role }) => {
+    const newUser = { id: crypto.randomUUID(), email, role };
+    setUsers((prev) => {
+      const next = [newUser, ...prev];
+      saveUsers(next);
+      return next;
+    });
+  };
+
+  const onRemoveUser = (id) => {
+    setUsers((prev) => {
+      const next = prev.filter((u) => u.id !== id);
+      saveUsers(next);
+      return next;
+    });
   };
 
   const performance = useMemo(() => {
     const stats = {};
     auditEvents.forEach((entry) => {
       if (!stats[entry.actor]) stats[entry.actor] = 0;
-      if (entry.action === 'moved' || entry.action === 'changed') stats[entry.actor] += 1;
+      // Count any move / status transition actions as "activity"
+      if (typeof entry.action === 'string' && entry.action.startsWith('moved')) {
+        stats[entry.actor] += 1;
+      }
     });
     return Object.entries(stats).map(([actor, moved]) => ({ actor, moved }));
   }, [auditEvents]);
@@ -102,7 +178,7 @@ export default function ManagerPage() {
           <thead>
             <tr>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>Stock #</th>
-              <th style={{ textAlign: 'left', padding: '0.5rem' }}>VIN</th>
+              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Year</th>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>Make/Model</th>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>Status</th>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>Action</th>
@@ -112,7 +188,7 @@ export default function ManagerPage() {
             {vehicles.map((v) => (
               <tr key={v.id} style={{ borderTop: '1px solid #e5e7eb' }}>
                 <td style={{ padding: '0.5rem' }}>{v.stockNumber || 'N/A'}</td>
-                <td style={{ padding: '0.5rem' }}>{v.vin || 'N/A'}</td>
+                <td style={{ padding: '0.5rem' }}>{v.year || 'N/A'}</td>
                 <td style={{ padding: '0.5rem' }}>{v.make} {v.model}</td>
                 <td style={{ padding: '0.5rem' }}>{v.status}</td>
                 <td style={{ padding: '0.5rem' }}>
@@ -126,14 +202,16 @@ export default function ManagerPage() {
         </table>
       </section>
 
+      <UserManagement users={users} onRoleUpdate={onUpdateUserRole} onAddUser={onAddUser} onRemoveUser={onRemoveUser} />
+
       <section style={{ marginTop: '1rem', padding: '1rem', background: '#fff', borderRadius: '0.75rem', border: '1px solid #d1d5db' }}>
-        <h3>Non-Manager Performance</h3>
+        <h3>Activity Analytics</h3>
         {performance.length === 0 ? (
           <p>No activity yet</p>
         ) : (
           <ul style={{ listStyle: 'none', padding: 0 }}>
             {performance.map((stat) => (
-              <li key={stat.actor}>{stat.actor}: {stat.moved} actions</li>
+              <li key={stat.actor}>{stat.actor}: {stat.moved} moves</li>
             ))}
           </ul>
         )}
