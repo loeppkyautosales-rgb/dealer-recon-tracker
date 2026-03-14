@@ -31,8 +31,9 @@ export default function ManagerPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const storedUsers = loadUsers(defaultUsers);
-    setUsers(storedUsers);
+    const storedUsers = loadUsers([]);
+    const mergedUsers = [...defaultUsers, ...storedUsers.filter(u => !defaultUsers.find(d => d.email === u.email))];
+    setUsers(mergedUsers);
 
     const storedVehicles = loadVehicles();
     if (storedVehicles.length) setVehicles(storedVehicles);
@@ -42,7 +43,9 @@ export default function ManagerPage() {
 
     const handleStorage = (event) => {
       if (event.key === STORAGE_KEYS.users) {
-        setUsers(loadUsers(defaultUsers));
+        const updatedStored = loadUsers([]);
+        const updatedMerged = [...defaultUsers, ...updatedStored.filter(u => !defaultUsers.find(d => d.email === u.email))];
+        setUsers(updatedMerged);
       }
       if (event.key === STORAGE_KEYS.vehicles) {
         setVehicles(loadVehicles());
