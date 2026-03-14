@@ -152,29 +152,10 @@ export default function Board() {
     });
   };
 
-  const handleDelete = (id) => {
-    if (!isManager) {
-      return;
-    }
-
+  const handleUpdateNotes = (id, newNotes) => {
     setVehicles((prev) => {
-      const removed = prev.find((v) => v.id === id);
-      const next = prev.filter((v) => v.id !== id);
+      const next = prev.map((v) => (v.id === id ? { ...v, notes: newNotes } : v));
       saveVehicles(next);
-
-      if (removed) {
-        appendAuditEvent({
-          actor: user?.email || 'unknown',
-          action: 'deleted',
-          stockNumber: removed.stockNumber,
-          year: removed.year,
-          make: removed.make,
-          model: removed.model,
-          status: removed.status,
-          time: new Date().toISOString(),
-        });
-      }
-
       return next;
     });
   };
@@ -245,6 +226,7 @@ export default function Board() {
               onDragStart={handleDragStart}
               onNext={handleNext}
               onDelete={isManager ? handleDelete : null}
+              onUpdateNotes={handleUpdateNotes}
             />
           );
         })}

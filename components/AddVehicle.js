@@ -5,6 +5,7 @@ export default function AddVehicle({ onAdd }) {
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
   const [year, setYear] = useState('');
+  const [color, setColor] = useState('#ffffff');
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -15,13 +16,15 @@ export default function AddVehicle({ onAdd }) {
       make,
       model,
       year,
-      status: 'New Arrivals',
+      color,
+      notes: '',
     });
 
     setStockNumber('');
     setMake('');
     setModel('');
     setYear('');
+    setColor('#ffffff');
   };
 
   return (
@@ -34,14 +37,18 @@ export default function AddVehicle({ onAdd }) {
           onChange={(e) => setStockNumber(e.target.value)}
         />
         <input
-          placeholder="Year"
-          value={year}
-          onChange={(e) => setYear(e.target.value)}
+          type="color"
+          value={color}
+          onChange={(e) => setColor(e.target.value)}
+          style={{ height: '2.5rem', cursor: 'pointer' }}
         />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
         <input placeholder="Make" value={make} onChange={(e) => setMake(e.target.value)} />
         <input placeholder="Model" value={model} onChange={(e) => setModel(e.target.value)} />
+      </div>
+      <div style={{ marginTop: '0.5rem' }}>
+        <input placeholder="Year" value={year} onChange={(e) => setYear(e.target.value)} />
       </div>
       <button type="submit" style={{ padding: '0.6rem 1rem', border: '1px solid #0b76f6', background: '#0b76f6', color: '#fff', borderRadius: '0.35rem' }}>
         Add Vehicle

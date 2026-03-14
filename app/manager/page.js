@@ -207,6 +207,7 @@ export default function ManagerPage() {
           <thead>
             <tr>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>Stock #</th>
+              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Color</th>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>Year</th>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>Make/Model</th>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>Status</th>
@@ -217,6 +218,12 @@ export default function ManagerPage() {
             {vehicles.map((v) => (
               <tr key={v.id} style={{ borderTop: '1px solid #e5e7eb' }}>
                 <td style={{ padding: '0.5rem' }}>{v.stockNumber || 'N/A'}</td>
+                <td style={{ padding: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ width: '20px', height: '20px', backgroundColor: v.color || '#ffffff', border: '1px solid #d1d5db', borderRadius: '2px' }}></div>
+                    {v.color || 'N/A'}
+                  </div>
+                </td>
                 <td style={{ padding: '0.5rem' }}>{v.year || 'N/A'}</td>
                 <td style={{ padding: '0.5rem' }}>{v.make} {v.model}</td>
                 <td style={{ padding: '0.5rem' }}>{v.status}</td>

@@ -1,6 +1,6 @@
 import VehicleCard from './VehicleCard';
 
-export default function Column({ status, vehicles, onDragOver, onDrop, onDragStart, onNext, onDelete }) {
+export default function Column({ status, vehicles, onDragOver, onDrop, onDragStart, onNext, onDelete, onUpdateNotes }) {
   return (
     <section
       onDragOver={onDragOver}
@@ -22,6 +22,7 @@ export default function Column({ status, vehicles, onDragOver, onDrop, onDragSta
             onDragStart={onDragStart}
             onAction={onNext ? onNext : null}
             onDelete={onDelete}
+            onUpdateNotes={onUpdateNotes}
           />
         ))}
       </div>
