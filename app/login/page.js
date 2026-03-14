@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { signIn } from '../../lib/auth';
+import { isSupabaseConfigured } from '../../lib/supabaseClient';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -31,6 +32,15 @@ export default function LoginPage() {
   return (
     <main className="container">
       <h1>Login</h1>
+      {!isSupabaseConfigured && (
+        <div style={{ padding: '1rem', border: '1px solid #f97316', borderRadius: '0.75rem', background: '#fff7ed', marginBottom: '1rem' }}>
+          <strong style={{ color: '#b45309' }}>Supabase is not configured.</strong>
+          <p style={{ margin: '0.4rem 0 0' }}>
+            The app is running without authentication because the required environment variables are missing.
+            Please set <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>.
+          </p>
+        </div>
+      )}
       <p>Please enter your email address and password below to access the Loeppky Auto Recon Board.</p>
       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '0.75rem', maxWidth: '400px' }}>
         <label>
