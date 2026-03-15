@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 
-export default function UserManagement({ users, onRoleUpdate, onAddUser, onRemoveUser }) {
+export default function UserManagement({ users, onRoleUpdate, onAddUser, onRemoveUser, onSetPassword }) {
   const [newEmail, setNewEmail] = useState('');
   const [newRole, setNewRole] = useState('user');
+  const [passwordDrafts, setPasswordDrafts] = useState({});
+  const [passwordStatus, setPasswordStatus] = useState({});
 
   const handleAdd = (e) => {
     e.preventDefault();
@@ -13,6 +15,26 @@ export default function UserManagement({ users, onRoleUpdate, onAddUser, onRemov
     onAddUser({ email, role: newRole });
     setNewEmail('');
     setNewRole('user');
+  };
+
+  const handleSetPassword = async (email) => {
+    if (!onSetPassword) return;
+    const nextPassword = passwordDrafts[email] || '';
+
+    if (nextPassword.length < 8) {
+      setPasswordStatus((prev) => ({ ...prev, [email]: 'Password must be at least 8 characters.' }));
+      return;
+    }
+
+    setPasswordStatus((prev) => ({ ...prev, [email]: 'Updating...' }));
+    const result = await onSetPassword(email, nextPassword);
+    if (result?.error) {
+      setPasswordStatus((prev) => ({ ...prev, [email]: result.error }));
+      return;
+    }
+
+    setPasswordDrafts((prev) => ({ ...prev, [email]: '' }));
+    setPasswordStatus((prev) => ({ ...prev, [email]: 'Password updated.' }));
   };
 
   return (
@@ -43,6 +65,7 @@ export default function UserManagement({ users, onRoleUpdate, onAddUser, onRemov
             <tr>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>Email</th>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>Role</th>
+              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Password</th>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>Actions</th>
             </tr>
           </thead>
@@ -51,6 +74,33 @@ export default function UserManagement({ users, onRoleUpdate, onAddUser, onRemov
               <tr key={user.id} style={{ borderTop: '1px solid #e5e7eb' }}>
                 <td style={{ padding: '0.5rem' }}>{user.email}</td>
                 <td style={{ padding: '0.5rem' }}>{user.role}</td>
+                <td style={{ padding: '0.5rem' }}>
+                  <div style={{ display: 'grid', gap: '0.35rem' }}>
+                    <div style={{ display: 'flex', gap: '0.35rem' }}>
+                      <input
+                        type="password"
+                        placeholder="New password"
+                        value={passwordDrafts[user.email] || ''}
+                        onChange={(e) => setPasswordDrafts((prev) => ({ ...prev, [user.email]: e.target.value }))}
+                        style={{ padding: '0.35rem', minWidth: '180px' }}
+                      />
+                      {onSetPassword && (
+                        <button
+                          type="button"
+                          style={{ padding: '0.35rem 0.5rem', borderRadius: '0.3rem', border: '1px solid #0b76f6', background: '#0b76f6', color: '#fff' }}
+                          onClick={() => handleSetPassword(user.email)}
+                        >
+                          Set
+                        </button>
+                      )}
+                    </div>
+                    {passwordStatus[user.email] && (
+                      <small style={{ color: passwordStatus[user.email] === 'Password updated.' ? '#166534' : '#b91c1c' }}>
+                        {passwordStatus[user.email]}
+                      </small>
+                    )}
+                  </div>
+                </td>
                 <td style={{ padding: '0.5rem', display: 'flex', gap: '0.5rem' }}>
                   {onRoleUpdate && (
                     <button

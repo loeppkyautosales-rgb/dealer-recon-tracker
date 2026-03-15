@@ -1,13 +1,35 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function VehicleCard({ vehicle, onDragStart, onAction, onDelete, onUpdateNotes }) {
   const [expanded, setExpanded] = useState(false);
   const [notes, setNotes] = useState(vehicle.notes || '');
+  const [saveTimer, setSaveTimer] = useState(null);
+
+  useEffect(() => {
+    setNotes(vehicle.notes || '');
+  }, [vehicle.notes]);
+
+  useEffect(() => {
+    return () => {
+      if (saveTimer) clearTimeout(saveTimer);
+    };
+  }, [saveTimer]);
 
   const handleSaveNotes = () => {
     if (onUpdateNotes) {
       onUpdateNotes(vehicle.id, notes);
     }
+  };
+
+  const scheduleSave = (value) => {
+    setNotes(value);
+    if (!onUpdateNotes) return;
+    if (saveTimer) clearTimeout(saveTimer);
+    setSaveTimer(
+      setTimeout(() => {
+        onUpdateNotes(vehicle.id, value);
+      }, 500),
+    );
   };
   return (
     <article
@@ -42,16 +64,10 @@ export default function VehicleCard({ vehicle, onDragStart, onAction, onDelete, 
         <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #e5e7eb' }}>
           <textarea
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            onChange={(e) => scheduleSave(e.target.value)}
             placeholder="Add notes..."
             style={{ width: '100%', minHeight: '60px', padding: '0.5rem', border: '1px solid #d1d5db', borderRadius: '0.3rem', resize: 'vertical' }}
           />
-          <button
-            onClick={handleSaveNotes}
-            style={{ marginTop: '0.5rem', padding: '0.3rem 0.6rem', border: '1px solid #0b76f6', background: '#0b76f6', color: 'white', borderRadius: '0.3rem', cursor: 'pointer' }}
-          >
-            Save Notes
-          </button>
         </div>
       )}
       <div style={{ marginTop: '0.5rem', display: 'grid', gap: '0.3rem' }}>

@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getCurrentUser } from '../../lib/auth';
+import { getCurrentUser, managerSetUserPassword } from '../../lib/auth';
 import { STORAGE_KEYS, appendAuditEvent, loadAuditEvents, loadAuditLastPruned, loadUsers, loadVehicles, saveUsers, saveVehicles } from '../../lib/persistence';
 import AddVehicle from '../../components/AddVehicle';
 import UserManagement from '../../components/UserManagement';
 import AuditLog from '../../components/AuditLog';
+import PasswordSettings from '../../components/PasswordSettings';
 
 const defaultUsers = [
   { id: 'u1', email: 'buddy@loeppkyauto.ca', role: 'manager' },
@@ -157,6 +158,19 @@ export default function ManagerPage() {
     });
   };
 
+  const onSetUserPassword = async (email, newPassword) => {
+    const { error } = await managerSetUserPassword({
+      targetEmail: email,
+      newPassword,
+    });
+
+    if (error) {
+      return { error: error.message || 'Unable to set password' };
+    }
+
+    return { ok: true };
+  };
+
   const performance = useMemo(() => {
     const stats = {};
     auditEvents.forEach((entry) => {
@@ -241,7 +255,9 @@ export default function ManagerPage() {
         </table>
       </section>
 
-      <UserManagement users={users} onRoleUpdate={onUpdateUserRole} onAddUser={onAddUser} onRemoveUser={onRemoveUser} />
+      <UserManagement users={users} onRoleUpdate={onUpdateUserRole} onAddUser={onAddUser} onRemoveUser={onRemoveUser} onSetPassword={onSetUserPassword} />
+
+      <PasswordSettings />
 
       <section style={{ marginTop: '1rem', padding: '1rem', background: '#fff', borderRadius: '0.75rem', border: '1px solid #d1d5db' }}>
         <h3>Activity Analytics</h3>

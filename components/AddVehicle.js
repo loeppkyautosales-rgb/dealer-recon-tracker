@@ -5,7 +5,7 @@ export default function AddVehicle({ onAdd }) {
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
   const [year, setYear] = useState('');
-  const [color, setColor] = useState('#ffffff');
+  const [color, setColor] = useState('#000000');
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -17,6 +17,7 @@ export default function AddVehicle({ onAdd }) {
       model,
       year,
       color,
+      status: 'New Arrivals',
       notes: '',
     });
 
@@ -24,7 +25,7 @@ export default function AddVehicle({ onAdd }) {
     setMake('');
     setModel('');
     setYear('');
-    setColor('#ffffff');
+    setColor('#000000');
   };
 
   return (
@@ -36,12 +37,18 @@ export default function AddVehicle({ onAdd }) {
           required
           onChange={(e) => setStockNumber(e.target.value)}
         />
-        <input
-          type="color"
-          value={color}
-          onChange={(e) => setColor(e.target.value)}
-          style={{ height: '2.5rem', cursor: 'pointer' }}
-        />
+        <select value={color} onChange={(e) => setColor(e.target.value)} style={{ padding: '0.5rem' }}>
+          <option value="#000000">Black</option>
+          <option value="#ffffff">White</option>
+          <option value="#8b8c8d">Gray</option>
+          <option value="#1f2937">Charcoal</option>
+          <option value="#0b3d91">Blue</option>
+          <option value="#b91c1c">Red</option>
+          <option value="#065f46">Green</option>
+          <option value="#92400e">Brown</option>
+          <option value="#eab308">Yellow</option>
+          <option value="#6d28d9">Purple</option>
+        </select>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
         <input placeholder="Make" value={make} onChange={(e) => setMake(e.target.value)} />
