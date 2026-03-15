@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser } from '../../lib/auth';
-import { STORAGE_KEYS, appendAuditEvent, loadAuditEvents, loadUsers, loadVehicles, saveUsers, saveVehicles } from '../../lib/persistence';
+import { STORAGE_KEYS, appendAuditEvent, loadAuditEvents, loadAuditLastPruned, loadUsers, loadVehicles, saveUsers, saveVehicles } from '../../lib/persistence';
 import AddVehicle from '../../components/AddVehicle';
 import UserManagement from '../../components/UserManagement';
 import AuditLog from '../../components/AuditLog';
@@ -26,6 +26,7 @@ export default function ManagerPage() {
   const [debugInfo, setDebugInfo] = useState({});
   const [vehicles, setVehicles] = useState(initialVehicles);
   const [auditEvents, setAuditEvents] = useState([]);
+  const [auditLastPruned, setAuditLastPruned] = useState(null);
   const [users, setUsers] = useState(defaultUsers);
 
   const router = useRouter();
@@ -40,6 +41,7 @@ export default function ManagerPage() {
 
     const storedAudit = loadAuditEvents();
     if (storedAudit.length) setAuditEvents(storedAudit);
+    setAuditLastPruned(loadAuditLastPruned());
 
     const handleStorage = (event) => {
       if (event.key === STORAGE_KEYS.users) {
@@ -52,6 +54,7 @@ export default function ManagerPage() {
       }
       if (event.key === STORAGE_KEYS.auditEvents) {
         setAuditEvents(loadAuditEvents());
+        setAuditLastPruned(loadAuditLastPruned());
       }
     };
 
@@ -253,7 +256,7 @@ export default function ManagerPage() {
         )}
       </section>
 
-      <AuditLog entries={auditEvents} />
+      <AuditLog entries={auditEvents} lastPruned={auditLastPruned} />
 
       <section style={{ marginTop: '1rem', padding: '1rem', background: '#fff', borderRadius: '0.75rem', border: '1px solid #d1d5db' }}>
         <h3>Debug Info</h3>

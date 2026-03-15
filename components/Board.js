@@ -160,6 +160,31 @@ export default function Board() {
     });
   };
 
+  const handleDelete = (id) => {
+    if (!isManager) return;
+
+    const deleted = vehicles.find((v) => v.id === id);
+
+    setVehicles((prev) => {
+      const next = prev.filter((v) => v.id !== id);
+      saveVehicles(next);
+      return next;
+    });
+
+    if (deleted) {
+      appendAuditEvent({
+        actor: user?.email || 'unknown',
+        action: 'deleted',
+        stockNumber: deleted.stockNumber,
+        year: deleted.year,
+        make: deleted.make,
+        model: deleted.model,
+        status: deleted.status,
+        time: new Date().toISOString(),
+      });
+    }
+  };
+
   const onSignOut = async () => {
     await signOut();
     setUser(null);

@@ -1,6 +1,6 @@
 'use client';
 
-export default function AuditLog({ entries }) {
+export default function AuditLog({ entries, lastPruned }) {
   if (!entries || entries.length === 0) {
     return <div style={{ marginTop: '1.5rem' }}>No audit events yet.</div>;
   }
@@ -8,6 +8,12 @@ export default function AuditLog({ entries }) {
   return (
     <section style={{ marginTop: '1.5rem', padding: '1rem', border: '1px solid #d1d5db', borderRadius: '0.75rem', background: '#fff' }}>
       <h3>Audit Log</h3>
+      <p style={{ margin: '0.25rem 0 0', color: '#6b7280', fontSize: '0.9rem' }}>
+        Records older than 60 days are automatically pruned.
+        {lastPruned && (
+          <span> Last cleaned: {new Date(lastPruned).toLocaleString()}.</span>
+        )}
+      </p>
       <ul style={{ maxHeight: '260px', overflowY: 'auto', padding: 0, margin: 0, listStyle: 'none' }}>
         {entries.map((entry, idx) => {
           const vehicleLabel = entry.stockNumber
