@@ -19,6 +19,36 @@ const defaultUsers = [
 
 const initialVehicles = [];
 
+function mergeUsers(defaultList, storedList) {
+  const map = new Map(defaultList.map((u) => [u.email.toLowerCase(), { ...u }]));
+  (storedList || []).forEach((u) => {
+    const key = (u.email || '').toLowerCase();
+    if (!key) return;
+    map.set(key, { ...map.get(key), ...u });
+  });
+  return Array.from(map.values());
+}
+
+const colorHexToName = {
+  '#000000': 'Black',
+  '#ffffff': 'White',
+  '#8b8c8d': 'Gray',
+  '#0b3d91': 'Blue',
+  '#b91c1c': 'Red',
+  '#065f46': 'Green',
+  '#92400e': 'Brown',
+  '#eab308': 'Yellow',
+  '#c0c0c0': 'Silver',
+  '#ffd700': 'Gold',
+};
+
+function getColorLabel(color) {
+  if (!color) return 'N/A';
+  const lower = String(color).toLowerCase();
+  if (colorHexToName[lower]) return colorHexToName[lower];
+  return String(color).charAt(0).toUpperCase() + String(color).slice(1).toLowerCase();
+}
+
 export default function ManagerPage() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -33,7 +63,7 @@ export default function ManagerPage() {
 
   useEffect(() => {
     const storedUsers = loadUsers([]);
-    const mergedUsers = [...defaultUsers, ...storedUsers.filter(u => !defaultUsers.find(d => d.email === u.email))];
+    const mergedUsers = mergeUsers(defaultUsers, storedUsers);
     setUsers(mergedUsers);
 
     const storedVehicles = loadVehicles();
@@ -46,7 +76,7 @@ export default function ManagerPage() {
     const handleStorage = (event) => {
       if (event.key === STORAGE_KEYS.users) {
         const updatedStored = loadUsers([]);
-        const updatedMerged = [...defaultUsers, ...updatedStored.filter(u => !defaultUsers.find(d => d.email === u.email))];
+        const updatedMerged = mergeUsers(defaultUsers, updatedStored);
         setUsers(updatedMerged);
       }
       if (event.key === STORAGE_KEYS.vehicles) {
@@ -140,15 +170,6 @@ export default function ManagerPage() {
     });
   };
 
-  const onAddUser = ({ email, role }) => {
-    const newUser = { id: crypto.randomUUID(), email, role };
-    setUsers((prev) => {
-      const next = [newUser, ...prev];
-      saveUsers(next);
-      return next;
-    });
-  };
-
   const onRemoveUser = (id) => {
     setUsers((prev) => {
       const next = prev.filter((u) => u.id !== id);
@@ -237,7 +258,7 @@ export default function ManagerPage() {
                 <td style={{ padding: '0.5rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <div style={{ width: '20px', height: '20px', backgroundColor: v.color || '#ffffff', border: '1px solid #d1d5db', borderRadius: '2px' }}></div>
-                    {v.color || 'N/A'}
+                    {getColorLabel(v.color)}
                   </div>
                 </td>
                 <td style={{ padding: '0.5rem' }}>{v.year || 'N/A'}</td>
@@ -254,7 +275,13 @@ export default function ManagerPage() {
         </table>
       </section>
 
-      <UserManagement users={users} onRoleUpdate={onUpdateUserRole} onAddUser={onAddUser} onRemoveUser={onRemoveUser} onSetPassword={onSetUserPassword} />
+      <UserManagement
+        users={users}
+        onRoleUpdate={onUpdateUserRole}
+        onRemoveUser={onRemoveUser}
+        onSetPassword={onSetUserPassword}
+        protectedUserEmails={defaultUsers.map((u) => u.email.toLowerCase())}
+      />
 
       <section style={{ marginTop: '1rem', padding: '1rem', background: '#fff', borderRadius: '0.75rem', border: '1px solid #d1d5db' }}>
         <h3>Activity Analytics</h3>

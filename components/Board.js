@@ -3,26 +3,37 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { statuses } from '../lib/statuses';
-import { appendAuditEvent, loadVehicles, saveVehicles, STORAGE_KEYS } from '../lib/persistence';
+import { appendAuditEvent, loadUsers, loadVehicles, saveVehicles, STORAGE_KEYS } from '../lib/persistence';
 import Column from './Column';
 import AddVehicle from './AddVehicle';
 import SearchBar from './SearchBar';
 import { getCurrentUser, signOut } from '../lib/auth';
 
 const initialVehicles = [];
+const defaultUsers = [
+  { id: 'u1', email: 'buddy@loeppkyauto.ca', role: 'manager' },
+  { id: 'u2', email: 'chris@loeppkyauto.ca', role: 'manager' },
+  { id: 'u3', email: 'loeppky22@gmail.com', role: 'manager' },
+  { id: 'u4', email: 'vinceloeppky@hotmail.com', role: 'manager' },
+  { id: 'u5', email: 'loeppky2001@protonmail.com', role: 'manager' },
+];
+
+function mergeUsers(defaultList, storedList) {
+  const map = new Map(defaultList.map((u) => [u.email.toLowerCase(), { ...u }]));
+  (storedList || []).forEach((u) => {
+    const key = (u.email || '').toLowerCase();
+    if (!key) return;
+    map.set(key, { ...map.get(key), ...u });
+  });
+  return Array.from(map.values());
+}
 
 export default function Board() {
   const [vehicles, setVehicles] = useState(initialVehicles);
   const [searchText, setSearchText] = useState('');
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
-  const [users, setUsers] = useState([
-    { id: 'u1', email: 'buddy@loeppkyauto.ca', role: 'manager' },
-    { id: 'u2', email: 'chris@loeppkyauto.ca', role: 'manager' },
-    { id: 'u3', email: 'loeppky22@gmail.com', role: 'manager' },
-    { id: 'u4', email: 'vinceloeppky@hotmail.com', role: 'manager' },
-    { id: 'u5', email: 'loeppky2001@protonmail.com', role: 'manager' },
-  ]);
+  const [users, setUsers] = useState(defaultUsers);
 
   useEffect(() => {
     const stored = loadVehicles();
@@ -30,9 +41,15 @@ export default function Board() {
       setVehicles(stored);
     }
 
+    const storedUsers = loadUsers([]);
+    setUsers(mergeUsers(defaultUsers, storedUsers));
+
     const handleStorage = (event) => {
       if (event.key === STORAGE_KEYS.vehicles) {
         setVehicles(loadVehicles());
+      }
+      if (event.key === STORAGE_KEYS.users) {
+        setUsers(mergeUsers(defaultUsers, loadUsers([])));
       }
     };
 
@@ -70,11 +87,10 @@ export default function Board() {
 
   const isManager = useMemo(() => {
     if (!user) return false;
-    const role = user.app_metadata?.role || user.user_metadata?.role || user.role || 'user';
-    if (role === 'manager') return true;
-
     const localUser = users.find((u) => u.email === user.email || u.id === user.id);
-    return localUser?.role === 'manager';
+    const roleFromAuth = user.app_metadata?.role || user.user_metadata?.role || user.role || 'user';
+    const resolvedRole = localUser?.role || roleFromAuth;
+    return resolvedRole === 'manager';
   }, [user, users]);
 
   const handleAdd = (newVehicle) => {

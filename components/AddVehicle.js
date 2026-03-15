@@ -5,7 +5,7 @@ export default function AddVehicle({ onAdd }) {
   const [make, setMake] = useState('');
   const [model, setModel] = useState('');
   const [year, setYear] = useState('');
-  const [color, setColor] = useState('#000000');
+  const [color, setColor] = useState('Black');
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -25,7 +25,7 @@ export default function AddVehicle({ onAdd }) {
     setMake('');
     setModel('');
     setYear('');
-    setColor('#000000');
+    setColor('Black');
   };
 
   return (
@@ -38,16 +38,16 @@ export default function AddVehicle({ onAdd }) {
           onChange={(e) => setStockNumber(e.target.value)}
         />
         <select value={color} onChange={(e) => setColor(e.target.value)} style={{ padding: '0.5rem' }}>
-          <option value="#000000">Black</option>
-          <option value="#ffffff">White</option>
-          <option value="#8b8c8d">Gray</option>
-          <option value="#1f2937">Charcoal</option>
-          <option value="#0b3d91">Blue</option>
-          <option value="#b91c1c">Red</option>
-          <option value="#065f46">Green</option>
-          <option value="#92400e">Brown</option>
-          <option value="#eab308">Yellow</option>
-          <option value="#6d28d9">Purple</option>
+          <option value="Black">Black</option>
+          <option value="White">White</option>
+          <option value="Gray">Gray</option>
+          <option value="Blue">Blue</option>
+          <option value="Red">Red</option>
+          <option value="Green">Green</option>
+          <option value="Brown">Brown</option>
+          <option value="Yellow">Yellow</option>
+          <option value="Silver">Silver</option>
+          <option value="Gold">Gold</option>
         </select>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
