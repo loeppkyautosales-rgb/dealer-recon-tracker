@@ -41,13 +41,13 @@ export default function LoginPage() {
           </p>
         </div>
       )}
-      <p>Please enter your username/email and password below to access the Loeppky Auto Recon Board.</p>
+      <p>Please enter your email address and password below to access the Loeppky Auto Recon Board.</p>
       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '0.75rem', maxWidth: '400px' }}>
         <label>
-          Username or Email
+          Email
           <input
             name="email"
-            type="text"
+            type="email"
             value={email}
             required
             onChange={(e) => setEmail(e.target.value)}

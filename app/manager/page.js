@@ -5,8 +5,18 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, managerSetUserPassword } from '../../lib/auth';
 import { statuses } from '../../lib/statuses';
-import { STORAGE_KEYS, appendAuditEvent, loadAuditEvents, loadAuditLastPruned, loadLocalAuthUsers, loadStageSlaHours, loadUsers, loadVehicles, saveLocalAuthUsers, saveStageSlaHours, saveUsers, saveVehicles } from '../../lib/persistence';
+import { STORAGE_KEYS, loadAuditLastPruned, loadUsers, saveUsers, saveVehicles } from '../../lib/persistence';
 import { formatWeeksDaysHours, toMs } from '../../lib/time';
+import {
+  appendAuditEventShared,
+  deleteVehicleShared,
+  fetchAuditEventsShared,
+  fetchStageSlaHoursShared,
+  fetchVehiclesShared,
+  getSyncHealthSnapshot,
+  saveStageSlaTargetShared,
+  subscribeSharedChanges,
+} from '../../lib/sharedData';
 import UserManagement from '../../components/UserManagement';
 import AuditLog from '../../components/AuditLog';
 
@@ -85,48 +95,63 @@ export default function ManagerPage() {
     audit: null,
     users: null,
   });
+  const [vehicleSort, setVehicleSort] = useState({ key: 'stockNumber', direction: 'asc' });
+  const [syncHealth, setSyncHealth] = useState(getSyncHealthSnapshot());
 
   const router = useRouter();
 
   useEffect(() => {
+    let mounted = true;
+
+    const refreshSyncBadge = () => {
+      if (!mounted) return;
+      setSyncHealth(getSyncHealthSnapshot());
+    };
+
+    const refreshShared = async () => {
+      const [nextVehicles, nextAudit, nextSla] = await Promise.all([
+        fetchVehiclesShared(),
+        fetchAuditEventsShared(),
+        fetchStageSlaHoursShared(defaultStageSlaHours),
+      ]);
+
+      if (!mounted) return;
+
+      setVehicles(nextVehicles || []);
+      setAuditEvents(nextAudit || []);
+      setStageSlaHours({ ...defaultStageSlaHours, ...(nextSla || {}) });
+      setAuditLastPruned(loadAuditLastPruned());
+      setLastUpdated((prev) => ({
+        ...prev,
+        vehicles: new Date().toISOString(),
+        audit: new Date().toISOString(),
+      }));
+      refreshSyncBadge();
+    };
+
+    refreshShared();
+
     const storedUsers = loadUsers([]);
     const mergedUsers = mergeUsers(defaultUsers, storedUsers);
     setUsers(mergedUsers);
 
-    const storedVehicles = loadVehicles();
-    if (storedVehicles.length) setVehicles(storedVehicles);
-    setLastUpdated((prev) => ({ ...prev, vehicles: new Date().toISOString() }));
+    const unsubscribeShared = subscribeSharedChanges(refreshShared);
 
-    const storedAudit = loadAuditEvents();
-    if (storedAudit.length) setAuditEvents(storedAudit);
-    setAuditLastPruned(loadAuditLastPruned());
-
-    const storedSla = loadStageSlaHours(defaultStageSlaHours);
-    setStageSlaHours({ ...defaultStageSlaHours, ...storedSla });
-
-    const handleStorage = (event) => {
+    const handleUsersStorage = (event) => {
       if (event.key === STORAGE_KEYS.users) {
         const updatedStored = loadUsers([]);
         const updatedMerged = mergeUsers(defaultUsers, updatedStored);
         setUsers(updatedMerged);
         setLastUpdated((prev) => ({ ...prev, users: new Date().toISOString() }));
       }
-      if (event.key === STORAGE_KEYS.vehicles) {
-        setVehicles(loadVehicles());
-        setLastUpdated((prev) => ({ ...prev, vehicles: new Date().toISOString() }));
-      }
-      if (event.key === STORAGE_KEYS.auditEvents) {
-        setAuditEvents(loadAuditEvents());
-        setAuditLastPruned(loadAuditLastPruned());
-        setLastUpdated((prev) => ({ ...prev, audit: new Date().toISOString() }));
-      }
-      if (event.key === STORAGE_KEYS.stageSlaHours) {
-        setStageSlaHours({ ...defaultStageSlaHours, ...loadStageSlaHours(defaultStageSlaHours) });
-      }
     };
 
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    window.addEventListener('storage', handleUsersStorage);
+    return () => {
+      mounted = false;
+      unsubscribeShared();
+      window.removeEventListener('storage', handleUsersStorage);
+    };
   }, []);
 
   useEffect(() => {
@@ -162,7 +187,7 @@ export default function ManagerPage() {
     initAuth();
   }, [router, users]);
 
-  const addAudit = (action, vehicle) => {
+  const addAudit = async (action, vehicle) => {
     const entry = {
       actor: user?.email || 'unknown',
       action,
@@ -175,11 +200,11 @@ export default function ManagerPage() {
     };
 
     setAuditEvents((prev) => [entry, ...prev]);
-    appendAuditEvent(entry);
+    await appendAuditEventShared(entry);
     setLastUpdated((prev) => ({ ...prev, audit: new Date().toISOString() }));
   };
 
-  const onDeleteVehicle = (id) => {
+  const onDeleteVehicle = async (id) => {
     const target = vehicles.find((v) => v.id === id);
     if (!target) return;
     setVehicles((prev) => {
@@ -187,7 +212,9 @@ export default function ManagerPage() {
       saveVehicles(next);
       return next;
     });
-    addAudit('deleted', target);
+    await deleteVehicleShared(id);
+    await addAudit('deleted', target);
+    setSyncHealth(getSyncHealthSnapshot());
     setLastUpdated((prev) => ({ ...prev, vehicles: new Date().toISOString() }));
   };
 
@@ -207,19 +234,6 @@ export default function ManagerPage() {
     setUsers((prev) => {
       const next = prev.map((u) => (u.id === id ? { ...u, role: newRole } : u));
       saveUsers(next);
-
-      const localAuthUsers = loadLocalAuthUsers();
-      const target = next.find((u) => u.id === id);
-      if (target) {
-        const syncedLocal = localAuthUsers.map((u) => {
-          const sameUserId = u.userId && target.id && u.userId === target.id;
-          const sameUsername = (u.username || '').toLowerCase() === (target.email || '').toLowerCase();
-          if (!sameUserId && !sameUsername) return u;
-          return { ...u, role: newRole };
-        });
-        saveLocalAuthUsers(syncedLocal);
-      }
-
       return next;
     });
     setLastUpdated((prev) => ({ ...prev, users: new Date().toISOString() }));
@@ -242,18 +256,6 @@ export default function ManagerPage() {
     setUsers((prev) => {
       const next = prev.filter((u) => u.id !== id);
       saveUsers(next);
-
-      const removedUser = prev.find((u) => u.id === id);
-      if (removedUser) {
-        const localAuthUsers = loadLocalAuthUsers();
-        const filteredLocal = localAuthUsers.filter((u) => {
-          const sameUserId = u.userId && removedUser.id && u.userId === removedUser.id;
-          const sameUsername = (u.username || '').toLowerCase() === (removedUser.email || '').toLowerCase();
-          return !sameUserId && !sameUsername;
-        });
-        saveLocalAuthUsers(filteredLocal);
-      }
-
       return next;
     });
     setLastUpdated((prev) => ({ ...prev, users: new Date().toISOString() }));
@@ -261,22 +263,6 @@ export default function ManagerPage() {
   };
 
   const onSetUserPassword = async (email, newPassword) => {
-    const localAuthUsers = loadLocalAuthUsers();
-    const normalizedEmail = String(email || '').toLowerCase();
-    const localMatchIndex = localAuthUsers.findIndex((u) =>
-      (u.username || '').toLowerCase() === normalizedEmail || (u.email || '').toLowerCase() === normalizedEmail,
-    );
-
-    if (localMatchIndex >= 0) {
-      const nextLocal = [...localAuthUsers];
-      nextLocal[localMatchIndex] = {
-        ...nextLocal[localMatchIndex],
-        password: newPassword,
-      };
-      saveLocalAuthUsers(nextLocal);
-      return { ok: true };
-    }
-
     const { error } = await managerSetUserPassword({
       targetEmail: email,
       newPassword,
@@ -289,53 +275,42 @@ export default function ManagerPage() {
     return { ok: true };
   };
 
-  const onAddLocalUser = ({ username, password }) => {
-    const trimmedUsername = String(username || '').trim();
-    const normalizedUsername = trimmedUsername.toLowerCase();
+  const getVehicleSortValue = (vehicle, key) => {
+    if (key === 'stockNumber') return String(vehicle.stockNumber || '').toLowerCase();
+    if (key === 'color') return getColorLabel(vehicle.color).toLowerCase();
+    if (key === 'year') return Number(vehicle.year) || 0;
+    if (key === 'makeModel') return `${vehicle.make || ''} ${vehicle.model || ''}`.trim().toLowerCase();
+    if (key === 'status') return String(vehicle.status || '').toLowerCase();
+    return '';
+  };
 
-    if (!trimmedUsername) {
-      return { error: 'Username is required.' };
-    }
-    if (password.length < 8) {
-      return { error: 'Password must be at least 8 characters.' };
-    }
+  const sortedVehicles = useMemo(() => {
+    const direction = vehicleSort.direction === 'asc' ? 1 : -1;
+    const sorted = [...vehicles].sort((a, b) => {
+      const aValue = getVehicleSortValue(a, vehicleSort.key);
+      const bValue = getVehicleSortValue(b, vehicleSort.key);
 
-    const existsInUsers = users.some((u) => (u.email || '').toLowerCase() === normalizedUsername);
-    if (existsInUsers) {
-      return { error: 'A user with that username already exists.' };
-    }
+      if (typeof aValue === 'number' && typeof bValue === 'number') {
+        return (aValue - bValue) * direction;
+      }
 
-    const localAuthUsers = loadLocalAuthUsers();
-    const existsInLocalAuth = localAuthUsers.some((u) => (u.username || '').toLowerCase() === normalizedUsername);
-    if (existsInLocalAuth) {
-      return { error: 'A local login with that username already exists.' };
-    }
+      return String(aValue).localeCompare(String(bValue), undefined, { numeric: true, sensitivity: 'base' }) * direction;
+    });
+    return sorted;
+  }, [vehicles, vehicleSort]);
 
-    const id = `local-${crypto.randomUUID()}`;
-    const newUser = {
-      id,
-      email: trimmedUsername,
-      role: 'user',
-    };
+  const toggleVehicleSort = (key) => {
+    setVehicleSort((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  };
 
-    const nextUsers = [...users, newUser];
-    setUsers(nextUsers);
-    saveUsers(nextUsers);
-
-    const nextLocalAuth = [
-      {
-        userId: id,
-        username: trimmedUsername,
-        email: trimmedUsername,
-        password,
-        role: 'user',
-      },
-      ...localAuthUsers,
-    ];
-    saveLocalAuthUsers(nextLocalAuth);
-    setLastUpdated((prev) => ({ ...prev, users: new Date().toISOString() }));
-
-    return { ok: true };
+  const renderSortArrow = (key) => {
+    if (vehicleSort.key !== key) return '↕';
+    return vehicleSort.direction === 'asc' ? '↑' : '↓';
   };
 
   const performance = useMemo(() => {
@@ -355,9 +330,10 @@ export default function ManagerPage() {
     const safe = Number.isFinite(parsed) && parsed >= 1 ? parsed : 1;
     setStageSlaHours((prev) => {
       const next = { ...prev, [status]: safe };
-      saveStageSlaHours(next);
+      saveStageSlaTargetShared(status, safe);
       return next;
     });
+    setSyncHealth(getSyncHealthSnapshot());
   };
 
   const exportLiveVehiclesCsv = () => {
@@ -560,7 +536,35 @@ export default function ManagerPage() {
 
   return (
     <main className="container">
-      <h1>Manager Portal</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
+        <h1>Manager Portal</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span
+            title={syncHealth.detail || ''}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              fontSize: '0.8rem',
+              borderRadius: '999px',
+              border: syncHealth.mode === 'cloud' ? '1px solid #16a34a' : '1px solid #b45309',
+              background: syncHealth.mode === 'cloud' ? '#dcfce7' : '#fef3c7',
+              color: syncHealth.mode === 'cloud' ? '#166534' : '#92400e',
+              padding: '0.2rem 0.55rem',
+            }}
+          >
+            {syncHealth.mode === 'cloud' ? 'Connected to Cloud' : 'Local Fallback'}
+          </span>
+          <Link href="/" style={{ textDecoration: 'none' }}>
+            <button
+              type="button"
+              style={{ padding: '0.4rem 0.8rem', borderRadius: '0.35rem', border: '1px solid #9ca3af', background: '#f3f4f6', color: '#111827' }}
+            >
+              Back to Board
+            </button>
+          </Link>
+        </div>
+      </div>
       <p>Manage vehicles, user roles, and track team performance.</p>
 
       <section style={{ marginTop: '1rem', padding: '1rem', background: '#fff', borderRadius: '0.75rem', border: '1px solid #d1d5db' }}>
@@ -616,16 +620,36 @@ export default function ManagerPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Stock #</th>
-              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Color</th>
-              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Year</th>
-              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Make/Model</th>
-              <th style={{ textAlign: 'left', padding: '0.5rem' }}>Status</th>
+              <th style={{ textAlign: 'left', padding: '0.5rem' }}>
+                <button type="button" onClick={() => toggleVehicleSort('stockNumber')} style={{ border: 'none', background: 'transparent', padding: 0, fontWeight: 600 }}>
+                  Stock # {renderSortArrow('stockNumber')}
+                </button>
+              </th>
+              <th style={{ textAlign: 'left', padding: '0.5rem' }}>
+                <button type="button" onClick={() => toggleVehicleSort('color')} style={{ border: 'none', background: 'transparent', padding: 0, fontWeight: 600 }}>
+                  Color {renderSortArrow('color')}
+                </button>
+              </th>
+              <th style={{ textAlign: 'left', padding: '0.5rem' }}>
+                <button type="button" onClick={() => toggleVehicleSort('year')} style={{ border: 'none', background: 'transparent', padding: 0, fontWeight: 600 }}>
+                  Year {renderSortArrow('year')}
+                </button>
+              </th>
+              <th style={{ textAlign: 'left', padding: '0.5rem' }}>
+                <button type="button" onClick={() => toggleVehicleSort('makeModel')} style={{ border: 'none', background: 'transparent', padding: 0, fontWeight: 600 }}>
+                  Make/Model {renderSortArrow('makeModel')}
+                </button>
+              </th>
+              <th style={{ textAlign: 'left', padding: '0.5rem' }}>
+                <button type="button" onClick={() => toggleVehicleSort('status')} style={{ border: 'none', background: 'transparent', padding: 0, fontWeight: 600 }}>
+                  Status {renderSortArrow('status')}
+                </button>
+              </th>
               <th style={{ textAlign: 'left', padding: '0.5rem' }}>Action</th>
             </tr>
           </thead>
           <tbody>
-            {vehicles.map((v) => (
+            {sortedVehicles.map((v) => (
               <tr key={v.id} style={{ borderTop: '1px solid #e5e7eb' }}>
                 <td style={{ padding: '0.5rem' }}>{v.stockNumber || 'N/A'}</td>
                 <td style={{ padding: '0.5rem' }}>
@@ -660,7 +684,6 @@ export default function ManagerPage() {
         onRoleUpdate={onUpdateUserRole}
         onRemoveUser={onRemoveUser}
         onSetPassword={onSetUserPassword}
-        onAddLocalUser={onAddLocalUser}
         protectedUserEmails={defaultUsers.map((u) => u.email.toLowerCase())}
         lastUpdated={lastUpdated.users}
       />
@@ -696,10 +719,6 @@ export default function ManagerPage() {
           <li><strong>Final Role:</strong> {debugInfo.finalRole || 'N/A'}</li>
         </ul>
       </section>
-
-      <p style={{ marginTop: '1rem' }}>
-        <Link href="/">Back to Board</Link>
-      </p>
     </main>
   );
 }

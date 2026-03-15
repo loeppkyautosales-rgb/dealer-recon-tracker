@@ -2,13 +2,10 @@
 
 import { useState } from 'react';
 
-export default function UserManagement({ users, onRoleUpdate, onRemoveUser, onSetPassword, onAddLocalUser, protectedUserEmails = [], lastUpdated }) {
+export default function UserManagement({ users, onRoleUpdate, onRemoveUser, onSetPassword, protectedUserEmails = [], lastUpdated }) {
   const [passwordDrafts, setPasswordDrafts] = useState({});
   const [passwordStatus, setPasswordStatus] = useState({});
   const [actionStatus, setActionStatus] = useState({});
-  const [newLocalUsername, setNewLocalUsername] = useState('');
-  const [newLocalPassword, setNewLocalPassword] = useState('');
-  const [addLocalStatus, setAddLocalStatus] = useState('');
 
   const handleSetPassword = async (email) => {
     if (!onSetPassword) return;
@@ -58,62 +55,10 @@ export default function UserManagement({ users, onRoleUpdate, onRemoveUser, onSe
     setActionStatus((prev) => ({ ...prev, [user.email]: '' }));
   };
 
-  const handleAddLocalUser = async (e) => {
-    e.preventDefault();
-    if (!onAddLocalUser) return;
-
-    const username = newLocalUsername.trim();
-    if (!username) {
-      setAddLocalStatus('Username is required.');
-      return;
-    }
-    if (newLocalPassword.length < 8) {
-      setAddLocalStatus('Password must be at least 8 characters.');
-      return;
-    }
-
-    const result = await onAddLocalUser({ username, password: newLocalPassword });
-    if (result?.error) {
-      setAddLocalStatus(result.error);
-      return;
-    }
-
-    setNewLocalUsername('');
-    setNewLocalPassword('');
-    setAddLocalStatus('Local user added.');
-  };
-
   return (
     <section style={{ marginTop: '1.5rem', padding: '1rem', border: '1px solid #d1d5db', borderRadius: '0.75rem', background: '#fff' }}>
       <h3>User Management</h3>
       {lastUpdated && <small style={{ color: '#6b7280' }}>Last updated: {new Date(lastUpdated).toLocaleString()}</small>}
-      {onAddLocalUser && (
-        <form onSubmit={handleAddLocalUser} style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
-          <input
-            type="text"
-            value={newLocalUsername}
-            onChange={(e) => setNewLocalUsername(e.target.value)}
-            placeholder="Local username"
-            style={{ padding: '0.4rem', minWidth: '200px' }}
-          />
-          <input
-            type="password"
-            value={newLocalPassword}
-            onChange={(e) => setNewLocalPassword(e.target.value)}
-            placeholder="Local password"
-            style={{ padding: '0.4rem', minWidth: '200px' }}
-          />
-          <button
-            type="submit"
-            style={{ padding: '0.4rem 0.65rem', borderRadius: '0.3rem', border: '1px solid #111827', background: '#111827', color: '#fff' }}
-          >
-            Add Local User
-          </button>
-          {addLocalStatus && (
-            <small style={{ color: addLocalStatus === 'Local user added.' ? '#166534' : '#b91c1c' }}>{addLocalStatus}</small>
-          )}
-        </form>
-      )}
 
       {(!users || users.length === 0) ? (
         <div style={{ marginTop: '1rem' }}>No users to manage.</div>

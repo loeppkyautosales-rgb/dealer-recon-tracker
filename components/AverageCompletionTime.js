@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { loadVehicles } from '../lib/persistence';
+import { fetchVehiclesShared, subscribeSharedChanges } from '../lib/sharedData';
 import { formatWeeksDaysHours, toMs } from '../lib/time';
 import { supabase } from '../lib/supabaseClient';
 
@@ -18,25 +18,37 @@ export default function AverageCompletionTime() {
       setIsLoggedIn(!!session);
     });
 
-    setVehicles(loadVehicles());
-
-    const handleStorage = (event) => {
-      if (event.key === 'dealer-recon:vehicles') {
-        setVehicles(loadVehicles());
-      }
+    let mounted = true;
+    const refreshVehicles = async () => {
+      const next = await fetchVehiclesShared();
+      if (mounted) setVehicles(next || []);
     };
 
-    window.addEventListener('storage', handleStorage);
+    refreshVehicles();
+
+    const unsubscribeShared = subscribeSharedChanges(refreshVehicles);
+    const timer = window.setInterval(refreshVehicles, 60_000);
+
     return () => {
+      mounted = false;
       subscription.unsubscribe();
-      window.removeEventListener('storage', handleStorage);
+      unsubscribeShared();
+      window.clearInterval(timer);
     };
   }, []);
 
   const summary = useMemo(() => {
-    const completed = vehicles.filter((v) => v.status === 'Recon Complete' && v.createdAt && v.completedAt);
+    const twoWeeksMs = 14 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const completed = vehicles.filter((v) => {
+      if (v.status !== 'Recon Complete' || !v.createdAt || !v.completedAt) return false;
+      const completedAtMs = toMs(v.completedAt);
+      if (!completedAtMs) return false;
+      return now - completedAtMs <= twoWeeksMs;
+    });
+
     if (!completed.length) {
-      return { label: 'N/A', completedCount: 0, skippedCount: vehicles.length };
+      return { label: 'N/A', completedCount: 0, skippedCount: 0, windowDays: 14 };
     }
 
     const durations = completed
@@ -48,13 +60,14 @@ export default function AverageCompletionTime() {
       })
       .filter((d) => d !== null);
 
-    const skippedCount = vehicles.filter((v) => v.status === 'Recon Complete').length - durations.length;
-    if (!durations.length) return { label: 'N/A', completedCount: 0, skippedCount };
+    const skippedCount = completed.length - durations.length;
+    if (!durations.length) return { label: 'N/A', completedCount: 0, skippedCount, windowDays: 14 };
     const avg = durations.reduce((sum, d) => sum + d, 0) / durations.length;
     return {
       label: formatWeeksDaysHours(avg),
       completedCount: durations.length,
       skippedCount,
+      windowDays: 14,
     };
   }, [vehicles]);
 
@@ -64,12 +77,12 @@ export default function AverageCompletionTime() {
     <div>
       <p style={{ marginBottom: '0.2rem' }}>
         Average Completion Time: {summary.label}{' '}
-        <span title="Calculated from vehicles that reached Recon Complete and have both created and completion timestamps." style={{ cursor: 'help', borderBottom: '1px dotted #6b7280' }}>
+        <span title="Calculated from vehicles completed in the last 14 days using total elapsed time (created to completion)." style={{ cursor: 'help', borderBottom: '1px dotted #6b7280' }}>
           (i)
         </span>
       </p>
       <small style={{ color: '#6b7280' }}>
-        Included: {summary.completedCount} complete vehicles. Skipped: {summary.skippedCount} incomplete/missing timestamps.
+        Window: last {summary.windowDays} days. Included: {summary.completedCount} complete vehicles. Skipped: {summary.skippedCount} incomplete/missing timestamps.
       </small>
     </div>
   );

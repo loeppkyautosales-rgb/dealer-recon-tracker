@@ -3,7 +3,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { statuses } from '../lib/statuses';
-import { appendAuditEvent, loadStageSlaHours, loadUsers, loadVehicles, saveVehicles, STORAGE_KEYS } from '../lib/persistence';
+import { loadUsers, saveVehicles, STORAGE_KEYS } from '../lib/persistence';
+import {
+  appendAuditEventShared,
+  createVehicleShared,
+  deleteVehicleShared,
+  fetchStageSlaHoursShared,
+  fetchVehiclesShared,
+  getSyncHealthSnapshot,
+  subscribeSharedChanges,
+  updateVehicleShared,
+} from '../lib/sharedData';
 import Column from './Column';
 import AddVehicle from './AddVehicle';
 import SearchBar from './SearchBar';
@@ -36,31 +46,46 @@ export default function Board() {
   const [loadingUser, setLoadingUser] = useState(true);
   const [users, setUsers] = useState(defaultUsers);
   const [stageSlaHours, setStageSlaHours] = useState(defaultStageSlaHours);
+  const [syncHealth, setSyncHealth] = useState(getSyncHealthSnapshot());
 
   useEffect(() => {
-    const stored = loadVehicles();
-    if (stored && stored.length) {
-      setVehicles(stored);
-    }
+    let mounted = true;
+
+    const refreshSyncBadge = () => {
+      if (!mounted) return;
+      setSyncHealth(getSyncHealthSnapshot());
+    };
+
+    const refreshShared = async () => {
+      const [nextVehicles, nextSla] = await Promise.all([
+        fetchVehiclesShared(),
+        fetchStageSlaHoursShared(defaultStageSlaHours),
+      ]);
+
+      if (!mounted) return;
+      setVehicles(nextVehicles || []);
+      setStageSlaHours({ ...defaultStageSlaHours, ...(nextSla || {}) });
+      refreshSyncBadge();
+    };
+
+    refreshShared();
 
     const storedUsers = loadUsers([]);
     setUsers(mergeUsers(defaultUsers, storedUsers));
-    setStageSlaHours({ ...defaultStageSlaHours, ...loadStageSlaHours(defaultStageSlaHours) });
 
-    const handleStorage = (event) => {
-      if (event.key === STORAGE_KEYS.vehicles) {
-        setVehicles(loadVehicles());
-      }
+    const unsubscribeShared = subscribeSharedChanges(refreshShared);
+    const handleUsersStorage = (event) => {
       if (event.key === STORAGE_KEYS.users) {
         setUsers(mergeUsers(defaultUsers, loadUsers([])));
       }
-      if (event.key === STORAGE_KEYS.stageSlaHours) {
-        setStageSlaHours({ ...defaultStageSlaHours, ...loadStageSlaHours(defaultStageSlaHours) });
-      }
     };
 
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    window.addEventListener('storage', handleUsersStorage);
+    return () => {
+      mounted = false;
+      unsubscribeShared();
+      window.removeEventListener('storage', handleUsersStorage);
+    };
   }, []);
   useEffect(() => {
     let isMounted = true;
@@ -99,7 +124,7 @@ export default function Board() {
     return resolvedRole === 'manager';
   }, [user, users]);
 
-  const handleAdd = (newVehicle) => {
+  const handleAdd = async (newVehicle) => {
     const nowIso = new Date().toISOString();
     const newItem = {
       ...newVehicle,
@@ -113,7 +138,7 @@ export default function Board() {
       return next;
     });
 
-    appendAuditEvent({
+    const entry = {
       actor: user?.email || 'unknown',
       action: 'created',
       stockNumber: newItem.stockNumber,
@@ -122,87 +147,111 @@ export default function Board() {
       model: newItem.model,
       status: newItem.status,
       time: new Date().toISOString(),
-    });
+    };
+
+    await createVehicleShared(newItem);
+    await appendAuditEventShared(entry);
+    setSyncHealth(getSyncHealthSnapshot());
   };
 
   const handleDragStart = (event, vehicleId) => {
     event.dataTransfer.setData('text/plain', vehicleId);
   };
 
-  const handleDrop = (event, targetStatus) => {
+  const handleDrop = async (event, targetStatus) => {
     event.preventDefault();
     const id = event.dataTransfer.getData('text/plain');
+    const movedVehicle = vehicles.find((v) => v.id === id);
+    if (!movedVehicle) return;
+    if (movedVehicle.status === targetStatus) return;
+
+    const nowIso = new Date().toISOString();
+    const from = movedVehicle.status;
+    const updates = {
+      status: targetStatus,
+      stageEnteredAt: nowIso,
+      completedAt: targetStatus === 'Recon Complete' ? (movedVehicle.completedAt || nowIso) : movedVehicle.completedAt,
+    };
 
     setVehicles((prev) => {
-      const nowIso = new Date().toISOString();
       const next = prev.map((v) => {
         if (v.id !== id) return v;
-        const from = v.status;
-        appendAuditEvent({
-          actor: user?.email || 'unknown',
-          action: `moved from ${from} to ${targetStatus}`,
-          stockNumber: v.stockNumber,
-          year: v.year,
-          make: v.make,
-          model: v.model,
-          status: targetStatus,
-          time: new Date().toISOString(),
-        });
         return {
           ...v,
-          status: targetStatus,
-          stageEnteredAt: nowIso,
-          completedAt: targetStatus === 'Recon Complete' ? (v.completedAt || nowIso) : v.completedAt,
+          ...updates,
         };
       });
       saveVehicles(next);
       return next;
     });
+
+    await updateVehicleShared(id, updates);
+    await appendAuditEventShared({
+      actor: user?.email || 'unknown',
+      action: `moved from ${from} to ${targetStatus}`,
+      stockNumber: movedVehicle.stockNumber,
+      year: movedVehicle.year,
+      make: movedVehicle.make,
+      model: movedVehicle.model,
+      status: targetStatus,
+      time: new Date().toISOString(),
+    });
+    setSyncHealth(getSyncHealthSnapshot());
   };
 
-  const handleNext = (id) => {
+  const handleNext = async (id) => {
+    const current = vehicles.find((v) => v.id === id);
+    if (!current) return;
+    const index = statuses.indexOf(current.status);
+    if (index === -1 || index === statuses.length - 1) return;
+
+    const nowIso = new Date().toISOString();
+    const nextStatus = statuses[index + 1];
+    const updates = {
+      status: nextStatus,
+      stageEnteredAt: nowIso,
+      completedAt: nextStatus === 'Recon Complete' ? (current.completedAt || nowIso) : current.completedAt,
+    };
+
     setVehicles((prev) => {
-      const nowIso = new Date().toISOString();
       const next = prev.map((v) => {
-        const index = statuses.indexOf(v.status);
-        if (v.id !== id || index === -1 || index === statuses.length - 1) return v;
-
-        const nextStatus = statuses[index + 1];
-        appendAuditEvent({
-          actor: user?.email || 'unknown',
-          action: `moved from ${v.status} to ${nextStatus}`,
-          stockNumber: v.stockNumber,
-          year: v.year,
-          make: v.make,
-          model: v.model,
-          status: nextStatus,
-          time: new Date().toISOString(),
-        });
-
-        return {
-          ...v,
-          status: nextStatus,
-          stageEnteredAt: nowIso,
-          completedAt: nextStatus === 'Recon Complete' ? (v.completedAt || nowIso) : v.completedAt,
-        };
+        if (v.id !== id) return v;
+        return { ...v, ...updates };
       });
       saveVehicles(next);
       return next;
     });
+
+    await updateVehicleShared(id, updates);
+    await appendAuditEventShared({
+      actor: user?.email || 'unknown',
+      action: `moved from ${current.status} to ${nextStatus}`,
+      stockNumber: current.stockNumber,
+      year: current.year,
+      make: current.make,
+      model: current.model,
+      status: nextStatus,
+      time: new Date().toISOString(),
+    });
+    setSyncHealth(getSyncHealthSnapshot());
   };
 
-  const handleUpdateNotes = (id, newNotes) => {
+  const handleUpdateNotes = async (id, newNotes) => {
     setVehicles((prev) => {
       const next = prev.map((v) => (v.id === id ? { ...v, notes: newNotes } : v));
       saveVehicles(next);
       return next;
     });
+
+    await updateVehicleShared(id, { notes: newNotes });
+    setSyncHealth(getSyncHealthSnapshot());
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (!isManager) return;
 
     const deleted = vehicles.find((v) => v.id === id);
+    if (!deleted) return;
 
     setVehicles((prev) => {
       const next = prev.filter((v) => v.id !== id);
@@ -210,18 +259,18 @@ export default function Board() {
       return next;
     });
 
-    if (deleted) {
-      appendAuditEvent({
-        actor: user?.email || 'unknown',
-        action: 'deleted',
-        stockNumber: deleted.stockNumber,
-        year: deleted.year,
-        make: deleted.make,
-        model: deleted.model,
-        status: deleted.status,
-        time: new Date().toISOString(),
-      });
-    }
+    await deleteVehicleShared(id);
+    await appendAuditEventShared({
+      actor: user?.email || 'unknown',
+      action: 'deleted',
+      stockNumber: deleted.stockNumber,
+      year: deleted.year,
+      make: deleted.make,
+      model: deleted.model,
+      status: deleted.status,
+      time: new Date().toISOString(),
+    });
+    setSyncHealth(getSyncHealthSnapshot());
   };
 
   const onSignOut = async () => {
@@ -248,9 +297,27 @@ export default function Board() {
   return (
     <section style={{ marginTop: '1rem' }}>
       <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '0.95rem', color: '#111827' }}>
-          Logged in as {user.email} ({isManager ? 'Manager' : 'User'})
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span style={{ fontSize: '0.95rem', color: '#111827' }}>
+            Logged in as {user.email} ({isManager ? 'Manager' : 'User'})
+          </span>
+          <span
+            title={syncHealth.detail || ''}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              fontSize: '0.8rem',
+              borderRadius: '999px',
+              border: syncHealth.mode === 'cloud' ? '1px solid #16a34a' : '1px solid #b45309',
+              background: syncHealth.mode === 'cloud' ? '#dcfce7' : '#fef3c7',
+              color: syncHealth.mode === 'cloud' ? '#166534' : '#92400e',
+              padding: '0.2rem 0.55rem',
+            }}
+          >
+            {syncHealth.mode === 'cloud' ? 'Connected to Cloud' : 'Local Fallback'}
+          </span>
+        </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
           <Link href="/password" style={{ textDecoration: 'none' }}>
             <button style={{ padding: '0.4rem 0.8rem', borderRadius: '0.35rem', border: '1px solid #9ca3af', background: '#f3f4f6', color: '#111827' }}>

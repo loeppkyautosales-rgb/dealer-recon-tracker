@@ -2,28 +2,29 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { statuses } from '../../lib/statuses';
-import { loadVehicles, STORAGE_KEYS } from '../../lib/persistence';
+import { fetchVehiclesShared, subscribeSharedChanges } from '../../lib/sharedData';
 import Column from '../../components/Column';
 
 export default function TvModePage() {
   const [vehicles, setVehicles] = useState([]);
 
   useEffect(() => {
-    setVehicles(loadVehicles());
-
-    const handleStorage = (event) => {
-      if (event.key === STORAGE_KEYS.vehicles) {
-        setVehicles(loadVehicles());
-      }
+    let mounted = true;
+    const refreshVehicles = async () => {
+      const next = await fetchVehiclesShared();
+      if (mounted) setVehicles(next || []);
     };
 
+    refreshVehicles();
+    const unsubscribeShared = subscribeSharedChanges(refreshVehicles);
+
     const intervalId = setInterval(() => {
-      setVehicles(loadVehicles());
+      refreshVehicles();
     }, 5 * 60 * 1000);
 
-    window.addEventListener('storage', handleStorage);
     return () => {
-      window.removeEventListener('storage', handleStorage);
+      mounted = false;
+      unsubscribeShared();
       clearInterval(intervalId);
     };
   }, []);
