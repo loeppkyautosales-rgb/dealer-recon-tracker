@@ -8,7 +8,6 @@ import { STORAGE_KEYS, appendAuditEvent, loadAuditEvents, loadAuditLastPruned, l
 import AddVehicle from '../../components/AddVehicle';
 import UserManagement from '../../components/UserManagement';
 import AuditLog from '../../components/AuditLog';
-import PasswordSettings from '../../components/PasswordSettings';
 
 const defaultUsers = [
   { id: 'u1', email: 'buddy@loeppkyauto.ca', role: 'manager' },
@@ -256,8 +255,6 @@ export default function ManagerPage() {
       </section>
 
       <UserManagement users={users} onRoleUpdate={onUpdateUserRole} onAddUser={onAddUser} onRemoveUser={onRemoveUser} onSetPassword={onSetUserPassword} />
-
-      <PasswordSettings />
 
       <section style={{ marginTop: '1rem', padding: '1rem', background: '#fff', borderRadius: '0.75rem', border: '1px solid #d1d5db' }}>
         <h3>Activity Analytics</h3>

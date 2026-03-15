@@ -9,26 +9,6 @@ body {
   color: #1f2937;
 }
 
-body.dark {
-  background: #0b1220;
-  color: #e5e7eb;
-}
-
-body.dark a {
-  color: #7dd3fc;
-}
-
-body.dark input,
-body.dark textarea {
-  background: #14213d;
-  color: #e5e7eb;
-  border: 1px solid #334155;
-}
-
-body.dark button {
-  border: 1px solid #334155;
-}
-
 .container {
   max-width: 1200px;
   margin: 0 auto;

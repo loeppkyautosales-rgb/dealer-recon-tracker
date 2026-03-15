@@ -4,10 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { statuses } from '../lib/statuses';
 import { appendAuditEvent, loadVehicles, saveVehicles, STORAGE_KEYS } from '../lib/persistence';
-import { applyTheme, loadTheme, saveTheme } from '../lib/theme';
 import Column from './Column';
 import AddVehicle from './AddVehicle';
-import PasswordSettings from './PasswordSettings';
 import SearchBar from './SearchBar';
 import { getCurrentUser, signOut } from '../lib/auth';
 
@@ -18,7 +16,6 @@ export default function Board() {
   const [searchText, setSearchText] = useState('');
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
-  const [theme, setTheme] = useState('light');
   const [users, setUsers] = useState([
     { id: 'u1', email: 'buddy@loeppkyauto.ca', role: 'manager' },
     { id: 'u2', email: 'chris@loeppkyauto.ca', role: 'manager' },
@@ -42,21 +39,6 @@ export default function Board() {
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
-  const toggleTheme = () => {
-    const next = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
-    applyTheme(next);
-    saveTheme(user?.email || 'default', next);
-  };
-
-  useEffect(() => {
-    if (!user) return;
-    const themeKey = user.email || 'default';
-    const initialTheme = loadTheme(themeKey);
-    setTheme(initialTheme);
-    applyTheme(initialTheme);
-  }, [user]);
-
   useEffect(() => {
     let isMounted = true;
 
@@ -230,12 +212,11 @@ export default function Board() {
           Logged in as {user.email} ({isManager ? 'Manager' : 'User'})
         </span>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button
-            onClick={toggleTheme}
-            style={{ padding: '0.4rem 0.8rem', borderRadius: '0.35rem', border: '1px solid #9ca3af', background: '#f3f4f6', color: '#111827' }}
-          >
-            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-          </button>
+          <Link href="/password" style={{ textDecoration: 'none' }}>
+            <button style={{ padding: '0.4rem 0.8rem', borderRadius: '0.35rem', border: '1px solid #9ca3af', background: '#f3f4f6', color: '#111827' }}>
+              Password Settings
+            </button>
+          </Link>
           {isManager && (
             <Link href="/manager" style={{ textDecoration: 'none' }}>
               <button style={{ padding: '0.4rem 0.8rem', borderRadius: '0.35rem', border: '1px solid #0b76f6', background: '#0b76f6', color: '#fff' }}>
@@ -253,7 +234,6 @@ export default function Board() {
       </div>
 
       {isManager && <AddVehicle onAdd={handleAdd} />}
-      <PasswordSettings />
       <SearchBar value={searchText} onChange={setSearchText} />
 
       <div
