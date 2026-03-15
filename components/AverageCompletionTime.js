@@ -3,11 +3,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { loadVehicles } from '../lib/persistence';
 import { formatWeeksDaysHours, toMs } from '../lib/time';
+import { supabase } from '../lib/supabaseClient';
 
 export default function AverageCompletionTime() {
   const [vehicles, setVehicles] = useState([]);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setIsLoggedIn(!!data?.session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsLoggedIn(!!session);
+    });
+
     setVehicles(loadVehicles());
 
     const handleStorage = (event) => {
@@ -17,7 +27,10 @@ export default function AverageCompletionTime() {
     };
 
     window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('storage', handleStorage);
+    };
   }, []);
 
   const summary = useMemo(() => {
@@ -44,6 +57,8 @@ export default function AverageCompletionTime() {
       skippedCount,
     };
   }, [vehicles]);
+
+  if (!isLoggedIn) return null;
 
   return (
     <div>

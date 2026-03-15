@@ -109,7 +109,6 @@ export default function UserManagement({ users, onRoleUpdate, onRemoveUser, onSe
                     <button
                       style={{ padding: '0.4rem 0.6rem', borderRadius: '0.3rem' }}
                       onClick={() => handleRoleToggle(user)}
-                      disabled={protectedUserEmails.includes((user.email || '').toLowerCase())}
                     >
                       make {user.role === 'manager' ? 'user' : 'manager'}
                     </button>

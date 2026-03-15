@@ -7,7 +7,6 @@ import { getCurrentUser, managerSetUserPassword } from '../../lib/auth';
 import { statuses } from '../../lib/statuses';
 import { STORAGE_KEYS, appendAuditEvent, loadAuditEvents, loadAuditLastPruned, loadStageSlaHours, loadUsers, loadVehicles, saveStageSlaHours, saveUsers, saveVehicles } from '../../lib/persistence';
 import { formatWeeksDaysHours, toMs } from '../../lib/time';
-import AddVehicle from '../../components/AddVehicle';
 import UserManagement from '../../components/UserManagement';
 import AuditLog from '../../components/AuditLog';
 
@@ -178,23 +177,6 @@ export default function ManagerPage() {
     setAuditEvents((prev) => [entry, ...prev]);
     appendAuditEvent(entry);
     setLastUpdated((prev) => ({ ...prev, audit: new Date().toISOString() }));
-  };
-
-  const onAddVehicle = (vehicle) => {
-    const nowIso = new Date().toISOString();
-    const newVehicle = {
-      ...vehicle,
-      id: crypto.randomUUID(),
-      createdAt: nowIso,
-      stageEnteredAt: nowIso,
-    };
-    setVehicles((prev) => {
-      const next = [newVehicle, ...prev];
-      saveVehicles(next);
-      return next;
-    });
-    setLastUpdated((prev) => ({ ...prev, vehicles: new Date().toISOString() }));
-    addAudit('created', newVehicle);
   };
 
   const onDeleteVehicle = (id) => {
@@ -389,6 +371,52 @@ export default function ManagerPage() {
     printWindow.close();
   };
 
+  const printAuditLog = () => {
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Audit Log</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 16px; color: #111827; }
+            h3 { margin-top: 0; }
+            p { color: #6b7280; font-size: 0.85rem; margin: 4px 0 12px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; font-size: 0.85rem; }
+            th { background: #f9fafb; }
+          </style>
+        </head>
+        <body>
+          <h3>Audit Log</h3>
+          <p>Printed: ${new Date().toLocaleString()} &mdash; ${auditEvents.length} events</p>
+          <table>
+            <thead>
+              <tr><th>Time</th><th>Actor</th><th>Action</th><th>Vehicle</th></tr>
+            </thead>
+            <tbody>
+              ${auditEvents.map((entry) => {
+                const vehicleLabel = entry.stockNumber
+                  ? `${entry.stockNumber} (${entry.year || 'n/a'})`
+                  : entry.vin || 'unknown vehicle';
+                return `<tr>
+                  <td>${new Date(entry.time).toLocaleString()}</td>
+                  <td>${entry.actor || ''}</td>
+                  <td>${entry.action || ''}</td>
+                  <td>${vehicleLabel}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
+  };
+
   const printSection = (sectionId, title) => {
     const section = document.getElementById(sectionId);
     if (!section) return;
@@ -448,11 +476,6 @@ export default function ManagerPage() {
     <main className="container">
       <h1>Manager Portal</h1>
       <p>Manage vehicles, user roles, and track team performance.</p>
-
-      <section style={{ marginTop: '1rem', padding: '1rem', background: '#fff', borderRadius: '0.75rem', border: '1px solid #d1d5db' }}>
-        <h3>Add Vehicle</h3>
-        <AddVehicle onAdd={onAddVehicle} />
-      </section>
 
       <section style={{ marginTop: '1rem', padding: '1rem', background: '#fff', borderRadius: '0.75rem', border: '1px solid #d1d5db' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -574,7 +597,7 @@ export default function ManagerPage() {
         lastUpdated={lastUpdated.audit}
         onExport={exportAuditCsv}
         sectionId="audit-log-section"
-        onPrint={() => printSection('audit-log-section', 'Audit Log')}
+        onPrint={printAuditLog}
       />
 
       <section style={{ marginTop: '1rem', padding: '1rem', background: '#fff', borderRadius: '0.75rem', border: '1px solid #d1d5db' }}>
