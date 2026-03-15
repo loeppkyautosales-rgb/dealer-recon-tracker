@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { statuses } from '../lib/statuses';
-import { appendAuditEvent, loadUsers, loadVehicles, saveVehicles, STORAGE_KEYS } from '../lib/persistence';
+import { appendAuditEvent, loadStageSlaHours, loadUsers, loadVehicles, saveVehicles, STORAGE_KEYS } from '../lib/persistence';
 import Column from './Column';
 import AddVehicle from './AddVehicle';
 import SearchBar from './SearchBar';
@@ -17,6 +17,7 @@ const defaultUsers = [
   { id: 'u4', email: 'vinceloeppky@hotmail.com', role: 'manager' },
   { id: 'u5', email: 'loeppky2001@protonmail.com', role: 'manager' },
 ];
+const defaultStageSlaHours = Object.fromEntries(statuses.map((s) => [s, 72]));
 
 function mergeUsers(defaultList, storedList) {
   const map = new Map(defaultList.map((u) => [u.email.toLowerCase(), { ...u }]));
@@ -34,6 +35,7 @@ export default function Board() {
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const [users, setUsers] = useState(defaultUsers);
+  const [stageSlaHours, setStageSlaHours] = useState(defaultStageSlaHours);
 
   useEffect(() => {
     const stored = loadVehicles();
@@ -43,6 +45,7 @@ export default function Board() {
 
     const storedUsers = loadUsers([]);
     setUsers(mergeUsers(defaultUsers, storedUsers));
+    setStageSlaHours({ ...defaultStageSlaHours, ...loadStageSlaHours(defaultStageSlaHours) });
 
     const handleStorage = (event) => {
       if (event.key === STORAGE_KEYS.vehicles) {
@@ -50,6 +53,9 @@ export default function Board() {
       }
       if (event.key === STORAGE_KEYS.users) {
         setUsers(mergeUsers(defaultUsers, loadUsers([])));
+      }
+      if (event.key === STORAGE_KEYS.stageSlaHours) {
+        setStageSlaHours({ ...defaultStageSlaHours, ...loadStageSlaHours(defaultStageSlaHours) });
       }
     };
 
@@ -94,7 +100,13 @@ export default function Board() {
   }, [user, users]);
 
   const handleAdd = (newVehicle) => {
-    const newItem = { ...newVehicle, id: crypto.randomUUID() };
+    const nowIso = new Date().toISOString();
+    const newItem = {
+      ...newVehicle,
+      id: crypto.randomUUID(),
+      createdAt: nowIso,
+      stageEnteredAt: nowIso,
+    };
     setVehicles((prev) => {
       const next = [newItem, ...prev];
       saveVehicles(next);
@@ -122,6 +134,7 @@ export default function Board() {
     const id = event.dataTransfer.getData('text/plain');
 
     setVehicles((prev) => {
+      const nowIso = new Date().toISOString();
       const next = prev.map((v) => {
         if (v.id !== id) return v;
         const from = v.status;
@@ -135,7 +148,12 @@ export default function Board() {
           status: targetStatus,
           time: new Date().toISOString(),
         });
-        return { ...v, status: targetStatus };
+        return {
+          ...v,
+          status: targetStatus,
+          stageEnteredAt: nowIso,
+          completedAt: targetStatus === 'Recon Complete' ? (v.completedAt || nowIso) : v.completedAt,
+        };
       });
       saveVehicles(next);
       return next;
@@ -144,6 +162,7 @@ export default function Board() {
 
   const handleNext = (id) => {
     setVehicles((prev) => {
+      const nowIso = new Date().toISOString();
       const next = prev.map((v) => {
         const index = statuses.indexOf(v.status);
         if (v.id !== id || index === -1 || index === statuses.length - 1) return v;
@@ -160,7 +179,12 @@ export default function Board() {
           time: new Date().toISOString(),
         });
 
-        return { ...v, status: nextStatus };
+        return {
+          ...v,
+          status: nextStatus,
+          stageEnteredAt: nowIso,
+          completedAt: nextStatus === 'Recon Complete' ? (v.completedAt || nowIso) : v.completedAt,
+        };
       });
       saveVehicles(next);
       return next;
@@ -233,6 +257,11 @@ export default function Board() {
               Password Settings
             </button>
           </Link>
+          <Link href="/tv" style={{ textDecoration: 'none' }}>
+            <button style={{ padding: '0.4rem 0.8rem', borderRadius: '0.35rem', border: '1px solid #9ca3af', background: '#f3f4f6', color: '#111827' }}>
+              TV Mode
+            </button>
+          </Link>
           {isManager && (
             <Link href="/manager" style={{ textDecoration: 'none' }}>
               <button style={{ padding: '0.4rem 0.8rem', borderRadius: '0.35rem', border: '1px solid #0b76f6', background: '#0b76f6', color: '#fff' }}>
@@ -266,6 +295,7 @@ export default function Board() {
               key={status}
               status={status}
               vehicles={boardVehicles}
+              stageLimitHours={stageSlaHours[status] || 72}
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleDrop}
               onDragStart={handleDragStart}

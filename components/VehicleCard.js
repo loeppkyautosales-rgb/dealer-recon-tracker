@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
+import { formatDaysHours, toMs } from '../lib/time';
 
-export default function VehicleCard({ vehicle, onDragStart, onAction, onDelete, onUpdateNotes }) {
+export default function VehicleCard({ vehicle, onDragStart, onAction, onDelete, onUpdateNotes, stageLimitHours = 72 }) {
   const [expanded, setExpanded] = useState(false);
   const [notes, setNotes] = useState(vehicle.notes || '');
   const [saveTimer, setSaveTimer] = useState(null);
+  const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
     setNotes(vehicle.notes || '');
@@ -15,11 +17,13 @@ export default function VehicleCard({ vehicle, onDragStart, onAction, onDelete, 
     };
   }, [saveTimer]);
 
-  const handleSaveNotes = () => {
-    if (onUpdateNotes) {
-      onUpdateNotes(vehicle.id, notes);
-    }
-  };
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 60_000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   const scheduleSave = (value) => {
     setNotes(value);
@@ -31,6 +35,15 @@ export default function VehicleCard({ vehicle, onDragStart, onAction, onDelete, 
       }, 500),
     );
   };
+
+  const createdAtMs = toMs(vehicle.createdAt) || now;
+  const stageEnteredAtMs = toMs(vehicle.stageEnteredAt) || createdAtMs;
+  const totalElapsedMs = Math.max(0, now - createdAtMs);
+  const stageElapsedMs = Math.max(0, now - stageEnteredAtMs);
+  const totalElapsedLabel = formatDaysHours(totalElapsedMs);
+  const stageElapsedLabel = formatDaysHours(stageElapsedMs);
+  const isStageOverdue = stageLimitHours > 0 && stageElapsedMs > stageLimitHours * 60 * 60 * 1000;
+
   return (
     <article
       draggable
@@ -45,7 +58,14 @@ export default function VehicleCard({ vehicle, onDragStart, onAction, onDelete, 
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
-        <h3 style={{ margin: 0, fontSize: '1rem' }}>{vehicle.stockNumber || 'Unknown Stock #'}</h3>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+          <h3 style={{ margin: 0, fontSize: '1rem' }}>{vehicle.stockNumber || 'Unknown Stock #'}</h3>
+          {isStageOverdue && (
+            <span style={{ fontSize: '0.72rem', color: '#92400e', background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '999px', padding: '0.1rem 0.45rem' }}>
+              Warning
+            </span>
+          )}
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>{vehicle.year || 'N/A'}</span>
           <button
@@ -59,7 +79,8 @@ export default function VehicleCard({ vehicle, onDragStart, onAction, onDelete, 
       <p style={{ margin: '0.25rem 0', color: '#374151' }}>
         {vehicle.make} {vehicle.model}
       </p>
-      <small style={{ color: '#6b7280' }}>Status: {vehicle.status}</small>
+      <small style={{ color: '#6b7280', display: 'block' }}>Total Elapsed: {totalElapsedLabel}</small>
+      <small style={{ color: '#6b7280', display: 'block', marginTop: '0.15rem' }}>Time In Stage: {stageElapsedLabel}</small>
       {expanded && (
         <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #e5e7eb' }}>
           <textarea
@@ -81,7 +102,11 @@ export default function VehicleCard({ vehicle, onDragStart, onAction, onDelete, 
         )}
         {onDelete && (
           <button
-            onClick={() => onDelete(vehicle.id)}
+            onClick={() => {
+              if (window.confirm('Delete this vehicle? This cannot be undone.')) {
+                onDelete(vehicle.id);
+              }
+            }}
             style={{ width: '100%', border: '1px solid #ef4444', background: '#ef4444', color: 'white', padding: '0.4rem', borderRadius: '0.3rem' }}
           >
             Delete (Manager)

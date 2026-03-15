@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 
-export default function UserManagement({ users, onRoleUpdate, onRemoveUser, onSetPassword, protectedUserEmails = [] }) {
+export default function UserManagement({ users, onRoleUpdate, onRemoveUser, onSetPassword, protectedUserEmails = [], lastUpdated }) {
   const [passwordDrafts, setPasswordDrafts] = useState({});
   const [passwordStatus, setPasswordStatus] = useState({});
+  const [actionStatus, setActionStatus] = useState({});
 
   const handleSetPassword = async (email) => {
     if (!onSetPassword) return;
@@ -16,6 +17,11 @@ export default function UserManagement({ users, onRoleUpdate, onRemoveUser, onSe
     }
 
     setPasswordStatus((prev) => ({ ...prev, [email]: 'Updating...' }));
+    if (!window.confirm(`Set a new password for ${email}?`)) {
+      setPasswordStatus((prev) => ({ ...prev, [email]: '' }));
+      return;
+    }
+
     const result = await onSetPassword(email, nextPassword);
     if (result?.error) {
       setPasswordStatus((prev) => ({ ...prev, [email]: result.error }));
@@ -26,9 +32,33 @@ export default function UserManagement({ users, onRoleUpdate, onRemoveUser, onSe
     setPasswordStatus((prev) => ({ ...prev, [email]: 'Password updated.' }));
   };
 
+  const handleRoleToggle = async (user) => {
+    if (!onRoleUpdate) return;
+    const nextRole = user.role === 'manager' ? 'user' : 'manager';
+    if (!window.confirm(`Change ${user.email} to ${nextRole}?`)) return;
+    const result = await onRoleUpdate(user.id, nextRole);
+    if (result?.error) {
+      setActionStatus((prev) => ({ ...prev, [user.email]: result.error }));
+      return;
+    }
+    setActionStatus((prev) => ({ ...prev, [user.email]: '' }));
+  };
+
+  const handleRemove = async (user) => {
+    if (!onRemoveUser) return;
+    if (!window.confirm(`Remove ${user.email}?`)) return;
+    const result = await onRemoveUser(user.id);
+    if (result?.error) {
+      setActionStatus((prev) => ({ ...prev, [user.email]: result.error }));
+      return;
+    }
+    setActionStatus((prev) => ({ ...prev, [user.email]: '' }));
+  };
+
   return (
     <section style={{ marginTop: '1.5rem', padding: '1rem', border: '1px solid #d1d5db', borderRadius: '0.75rem', background: '#fff' }}>
       <h3>User Management</h3>
+      {lastUpdated && <small style={{ color: '#6b7280' }}>Last updated: {new Date(lastUpdated).toLocaleString()}</small>}
 
       {(!users || users.length === 0) ? (
         <div style={{ marginTop: '1rem' }}>No users to manage.</div>
@@ -78,7 +108,8 @@ export default function UserManagement({ users, onRoleUpdate, onRemoveUser, onSe
                   {onRoleUpdate && (
                     <button
                       style={{ padding: '0.4rem 0.6rem', borderRadius: '0.3rem' }}
-                      onClick={() => onRoleUpdate(user.id, user.role === 'manager' ? 'user' : 'manager')}
+                      onClick={() => handleRoleToggle(user)}
+                      disabled={protectedUserEmails.includes((user.email || '').toLowerCase())}
                     >
                       make {user.role === 'manager' ? 'user' : 'manager'}
                     </button>
@@ -86,10 +117,13 @@ export default function UserManagement({ users, onRoleUpdate, onRemoveUser, onSe
                   {onRemoveUser && !protectedUserEmails.includes((user.email || '').toLowerCase()) && (
                     <button
                       style={{ padding: '0.4rem 0.6rem', borderRadius: '0.3rem', border: '1px solid #ef4444', background: '#ef4444', color: '#fff' }}
-                      onClick={() => onRemoveUser(user.id)}
+                      onClick={() => handleRemove(user)}
                     >
                       Remove
                     </button>
+                  )}
+                  {actionStatus[user.email] && (
+                    <small style={{ color: '#b91c1c', display: 'block' }}>{actionStatus[user.email]}</small>
                   )}
                 </td>
               </tr>
