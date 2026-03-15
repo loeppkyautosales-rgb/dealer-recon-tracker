@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, managerSetUserPassword } from '../../lib/auth';
 import { statuses } from '../../lib/statuses';
-import { STORAGE_KEYS, appendAuditEvent, loadAuditEvents, loadAuditLastPruned, loadStageSlaHours, loadUsers, loadVehicles, saveStageSlaHours, saveUsers, saveVehicles } from '../../lib/persistence';
+import { STORAGE_KEYS, appendAuditEvent, loadAuditEvents, loadAuditLastPruned, loadLocalAuthUsers, loadStageSlaHours, loadUsers, loadVehicles, saveLocalAuthUsers, saveStageSlaHours, saveUsers, saveVehicles } from '../../lib/persistence';
 import { formatWeeksDaysHours, toMs } from '../../lib/time';
 import UserManagement from '../../components/UserManagement';
 import AuditLog from '../../components/AuditLog';
@@ -194,10 +194,6 @@ export default function ManagerPage() {
   const onUpdateUserRole = (id, newRole) => {
     const target = users.find((u) => u.id === id);
     if (!target) return { error: 'User not found' };
-    const isProtected = defaultUsers.some((u) => u.email.toLowerCase() === (target.email || '').toLowerCase());
-    if (isProtected && newRole !== 'manager') {
-      return { error: 'Core manager accounts cannot be downgraded.' };
-    }
 
     const wouldBeManagers = users.filter((u) => {
       if (u.id === id) return newRole === 'manager';
@@ -211,6 +207,19 @@ export default function ManagerPage() {
     setUsers((prev) => {
       const next = prev.map((u) => (u.id === id ? { ...u, role: newRole } : u));
       saveUsers(next);
+
+      const localAuthUsers = loadLocalAuthUsers();
+      const target = next.find((u) => u.id === id);
+      if (target) {
+        const syncedLocal = localAuthUsers.map((u) => {
+          const sameUserId = u.userId && target.id && u.userId === target.id;
+          const sameUsername = (u.username || '').toLowerCase() === (target.email || '').toLowerCase();
+          if (!sameUserId && !sameUsername) return u;
+          return { ...u, role: newRole };
+        });
+        saveLocalAuthUsers(syncedLocal);
+      }
+
       return next;
     });
     setLastUpdated((prev) => ({ ...prev, users: new Date().toISOString() }));
@@ -233,6 +242,18 @@ export default function ManagerPage() {
     setUsers((prev) => {
       const next = prev.filter((u) => u.id !== id);
       saveUsers(next);
+
+      const removedUser = prev.find((u) => u.id === id);
+      if (removedUser) {
+        const localAuthUsers = loadLocalAuthUsers();
+        const filteredLocal = localAuthUsers.filter((u) => {
+          const sameUserId = u.userId && removedUser.id && u.userId === removedUser.id;
+          const sameUsername = (u.username || '').toLowerCase() === (removedUser.email || '').toLowerCase();
+          return !sameUserId && !sameUsername;
+        });
+        saveLocalAuthUsers(filteredLocal);
+      }
+
       return next;
     });
     setLastUpdated((prev) => ({ ...prev, users: new Date().toISOString() }));
@@ -240,6 +261,22 @@ export default function ManagerPage() {
   };
 
   const onSetUserPassword = async (email, newPassword) => {
+    const localAuthUsers = loadLocalAuthUsers();
+    const normalizedEmail = String(email || '').toLowerCase();
+    const localMatchIndex = localAuthUsers.findIndex((u) =>
+      (u.username || '').toLowerCase() === normalizedEmail || (u.email || '').toLowerCase() === normalizedEmail,
+    );
+
+    if (localMatchIndex >= 0) {
+      const nextLocal = [...localAuthUsers];
+      nextLocal[localMatchIndex] = {
+        ...nextLocal[localMatchIndex],
+        password: newPassword,
+      };
+      saveLocalAuthUsers(nextLocal);
+      return { ok: true };
+    }
+
     const { error } = await managerSetUserPassword({
       targetEmail: email,
       newPassword,
@@ -248,6 +285,55 @@ export default function ManagerPage() {
     if (error) {
       return { error: error.message || 'Unable to set password' };
     }
+
+    return { ok: true };
+  };
+
+  const onAddLocalUser = ({ username, password }) => {
+    const trimmedUsername = String(username || '').trim();
+    const normalizedUsername = trimmedUsername.toLowerCase();
+
+    if (!trimmedUsername) {
+      return { error: 'Username is required.' };
+    }
+    if (password.length < 8) {
+      return { error: 'Password must be at least 8 characters.' };
+    }
+
+    const existsInUsers = users.some((u) => (u.email || '').toLowerCase() === normalizedUsername);
+    if (existsInUsers) {
+      return { error: 'A user with that username already exists.' };
+    }
+
+    const localAuthUsers = loadLocalAuthUsers();
+    const existsInLocalAuth = localAuthUsers.some((u) => (u.username || '').toLowerCase() === normalizedUsername);
+    if (existsInLocalAuth) {
+      return { error: 'A local login with that username already exists.' };
+    }
+
+    const id = `local-${crypto.randomUUID()}`;
+    const newUser = {
+      id,
+      email: trimmedUsername,
+      role: 'user',
+    };
+
+    const nextUsers = [...users, newUser];
+    setUsers(nextUsers);
+    saveUsers(nextUsers);
+
+    const nextLocalAuth = [
+      {
+        userId: id,
+        username: trimmedUsername,
+        email: trimmedUsername,
+        password,
+        role: 'user',
+      },
+      ...localAuthUsers,
+    ];
+    saveLocalAuthUsers(nextLocalAuth);
+    setLastUpdated((prev) => ({ ...prev, users: new Date().toISOString() }));
 
     return { ok: true };
   };
@@ -574,6 +660,7 @@ export default function ManagerPage() {
         onRoleUpdate={onUpdateUserRole}
         onRemoveUser={onRemoveUser}
         onSetPassword={onSetUserPassword}
+        onAddLocalUser={onAddLocalUser}
         protectedUserEmails={defaultUsers.map((u) => u.email.toLowerCase())}
         lastUpdated={lastUpdated.users}
       />
