@@ -30,19 +30,20 @@ export default function Column({
         background: isQuickClean ? '#eaf4ef' : '#e5e7eb',
         border: isQuickClean ? '1px solid #b6d7c2' : '1px solid transparent',
         borderRadius: '0.8rem',
-        padding: '1rem',
-        minHeight: '420px',
+        padding: isQuickClean ? '1rem' : '0.75rem',
+        minHeight: isQuickClean ? '420px' : '380px',
+        minWidth: 0,
       }}
     >
-      <h2 style={{ borderBottom: '1px solid #d1d5db', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span>{status}</span>
+      <h2 style={{ borderBottom: '1px solid #d1d5db', paddingBottom: '0.45rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.35rem', fontSize: isQuickClean ? '1.15rem' : '0.92rem' }}>
+        <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{status}</span>
         {overdueCount > 0 && (
           <span style={{ fontSize: '0.72rem', color: '#92400e', background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '999px', padding: '0.15rem 0.45rem' }}>
             {overdueCount} overdue
           </span>
         )}
       </h2>
-      <div style={{ marginTop: '1rem' }}>
+      <div style={{ marginTop: isQuickClean ? '1rem' : '0.75rem' }}>
         {vehicles.length === 0 && <p style={{ color: '#6b7280' }}>{emptyLabel}</p>}
         {vehicles.map((vehicle) => (
           <VehicleCard

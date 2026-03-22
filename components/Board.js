@@ -329,8 +329,8 @@ export default function Board() {
 
   return (
     <section style={{ marginTop: '1rem' }}>
-      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+      <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.95rem', color: '#111827' }}>
             Logged in as {user.email} ({isManager ? 'Manager' : 'User'})
           </span>
@@ -351,7 +351,7 @@ export default function Board() {
             {syncHealth.mode === 'cloud' ? 'Connected to Cloud' : 'Local Fallback'}
           </span>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           <Link href="/password" style={{ textDecoration: 'none' }}>
             <button style={{ padding: '0.4rem 0.8rem', borderRadius: '0.35rem', border: '1px solid #9ca3af', background: '#f3f4f6', color: '#111827' }}>
               Password Settings
@@ -384,11 +384,10 @@ export default function Board() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: `repeat(${statuses.length}, minmax(270px, 1fr))`,
-          gap: '1rem',
-          overflowX: 'auto',
+          gridTemplateColumns: `repeat(${statuses.length}, minmax(0, 1fr))`,
+          gap: '0.7rem',
           alignItems: 'start',
-          paddingBottom: '0.25rem',
+          width: '100%',
         }}
       >
         {statuses.map((status) => {

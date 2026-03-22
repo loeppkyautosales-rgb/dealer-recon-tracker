@@ -57,16 +57,16 @@ export default function VehicleCard({
       onDragStart={(e) => onDragStart(e, vehicle.id)}
       style={{
         background: 'white',
-        padding: '0.8rem',
+        padding: '0.65rem',
         borderRadius: '0.6rem',
         boxShadow: '0 1px 3px rgba(15,23,42,.1)',
-        marginBottom: '0.75rem',
+        marginBottom: '0.6rem',
         borderLeft: `4px solid ${vehicle.color || '#ffffff'}`,
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <h3 style={{ margin: 0, fontSize: '1rem' }}>{vehicle.stockNumber || 'Unknown Stock #'}</h3>
+          <h3 style={{ margin: 0, fontSize: '0.92rem', overflowWrap: 'anywhere' }}>{vehicle.stockNumber || 'Unknown Stock #'}</h3>
           {isStageOverdue && (
             <span style={{ fontSize: '0.72rem', color: '#92400e', background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '999px', padding: '0.1rem 0.45rem' }}>
               Warning
@@ -83,11 +83,11 @@ export default function VehicleCard({
           </button>
         </div>
       </div>
-      <p style={{ margin: '0.25rem 0', color: '#374151' }}>
+      <p style={{ margin: '0.25rem 0', color: '#374151', fontSize: '0.9rem', overflowWrap: 'anywhere' }}>
         {vehicle.make} {vehicle.model}
       </p>
-      <small style={{ color: '#6b7280', display: 'block' }}>Total Elapsed: {totalElapsedLabel}</small>
-      <small style={{ color: '#6b7280', display: 'block', marginTop: '0.15rem' }}>Time In Stage: {stageElapsedLabel}</small>
+      <small style={{ color: '#6b7280', display: 'block', fontSize: '0.75rem' }}>Total Elapsed: {totalElapsedLabel}</small>
+      <small style={{ color: '#6b7280', display: 'block', marginTop: '0.15rem', fontSize: '0.75rem' }}>Time In Stage: {stageElapsedLabel}</small>
       {expanded && (
         <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #e5e7eb' }}>
           <textarea
@@ -102,7 +102,7 @@ export default function VehicleCard({
         {onAction && (
           <button
             onClick={() => onAction(vehicle.id)}
-            style={{ width: '100%', border: '1px solid #0b76f6', background: '#0b76f6', color: 'white', padding: '0.4rem', borderRadius: '0.3rem' }}
+            style={{ width: '100%', border: '1px solid #0b76f6', background: '#0b76f6', color: 'white', padding: '0.35rem', borderRadius: '0.3rem', fontSize: '0.82rem' }}
           >
             {actionLabel}
           </button>
