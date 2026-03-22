@@ -9,6 +9,7 @@ export default function VehicleCard({
   onUpdateNotes,
   stageLimitHours = 72,
   actionLabel = 'Next Stage',
+  compact = false,
 }) {
   const [expanded, setExpanded] = useState(false);
   const [notes, setNotes] = useState(vehicle.notes || '');
@@ -57,24 +58,24 @@ export default function VehicleCard({
       onDragStart={(e) => onDragStart(e, vehicle.id)}
       style={{
         background: 'white',
-        padding: '0.65rem',
+        padding: compact ? '0.8rem' : '0.65rem',
         borderRadius: '0.6rem',
         boxShadow: '0 1px 3px rgba(15,23,42,.1)',
         marginBottom: '0.6rem',
         borderLeft: `4px solid ${vehicle.color || '#ffffff'}`,
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <h3 style={{ margin: 0, fontSize: '0.92rem', overflowWrap: 'anywhere' }}>{vehicle.stockNumber || 'Unknown Stock #'}</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', alignItems: compact ? 'flex-start' : 'center' }}>
+        <div style={{ display: 'flex', alignItems: compact ? 'flex-start' : 'center', gap: '0.4rem', flexDirection: compact ? 'column' : 'row' }}>
+          <h3 style={{ margin: 0, fontSize: compact ? '1rem' : '0.92rem', overflowWrap: 'anywhere' }}>{vehicle.stockNumber || 'Unknown Stock #'}</h3>
           {isStageOverdue && (
             <span style={{ fontSize: '0.72rem', color: '#92400e', background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: '999px', padding: '0.1rem 0.45rem' }}>
               Warning
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>{vehicle.year || 'N/A'}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+          <span style={{ fontSize: compact ? '0.85rem' : '0.8rem', color: '#6b7280' }}>{vehicle.year || 'N/A'}</span>
           <button
             onClick={() => setExpanded(!expanded)}
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem' }}
@@ -83,11 +84,11 @@ export default function VehicleCard({
           </button>
         </div>
       </div>
-      <p style={{ margin: '0.25rem 0', color: '#374151', fontSize: '0.9rem', overflowWrap: 'anywhere' }}>
+      <p style={{ margin: '0.25rem 0', color: '#374151', fontSize: compact ? '0.95rem' : '0.9rem', overflowWrap: 'anywhere' }}>
         {vehicle.make} {vehicle.model}
       </p>
-      <small style={{ color: '#6b7280', display: 'block', fontSize: '0.75rem' }}>Total Elapsed: {totalElapsedLabel}</small>
-      <small style={{ color: '#6b7280', display: 'block', marginTop: '0.15rem', fontSize: '0.75rem' }}>Time In Stage: {stageElapsedLabel}</small>
+      <small style={{ color: '#6b7280', display: 'block', fontSize: compact ? '0.82rem' : '0.75rem' }}>Total Elapsed: {totalElapsedLabel}</small>
+      <small style={{ color: '#6b7280', display: 'block', marginTop: '0.15rem', fontSize: compact ? '0.82rem' : '0.75rem' }}>Time In Stage: {stageElapsedLabel}</small>
       {expanded && (
         <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px solid #e5e7eb' }}>
           <textarea
@@ -102,7 +103,7 @@ export default function VehicleCard({
         {onAction && (
           <button
             onClick={() => onAction(vehicle.id)}
-            style={{ width: '100%', border: '1px solid #0b76f6', background: '#0b76f6', color: 'white', padding: '0.35rem', borderRadius: '0.3rem', fontSize: '0.82rem' }}
+            style={{ width: '100%', border: '1px solid #0b76f6', background: '#0b76f6', color: 'white', padding: compact ? '0.5rem' : '0.35rem', borderRadius: '0.3rem', fontSize: compact ? '0.9rem' : '0.82rem' }}
           >
             {actionLabel}
           </button>
@@ -114,7 +115,7 @@ export default function VehicleCard({
                 onDelete(vehicle.id);
               }
             }}
-            style={{ width: '100%', border: '1px solid #ef4444', background: '#ef4444', color: 'white', padding: '0.4rem', borderRadius: '0.3rem' }}
+            style={{ width: '100%', border: '1px solid #ef4444', background: '#ef4444', color: 'white', padding: compact ? '0.5rem' : '0.4rem', borderRadius: '0.3rem', fontSize: compact ? '0.9rem' : '0.82rem' }}
           >
             Delete (Manager)
           </button>

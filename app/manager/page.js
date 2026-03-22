@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, managerSetUserPassword } from '../../lib/auth';
 import { FINAL_STATUS, statuses } from '../../lib/statuses';
-import { STORAGE_KEYS, loadAuditLastPruned, loadUsers, saveUsers, saveVehicles } from '../../lib/persistence';
+import { AUDIT_RETENTION_DAYS, STORAGE_KEYS, loadAuditLastPruned, loadUsers, saveUsers, saveVehicles } from '../../lib/persistence';
 import { formatWeeksDaysHours, toMs } from '../../lib/time';
 import {
   appendAuditEventShared,
@@ -313,9 +313,17 @@ export default function ManagerPage() {
     return vehicleSort.direction === 'asc' ? '↑' : '↓';
   };
 
+  const recentAnalyticsEvents = useMemo(() => {
+    const cutoff = Date.now() - AUDIT_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    return auditEvents.filter((entry) => {
+      const timeMs = toMs(entry.time);
+      return timeMs && timeMs >= cutoff;
+    });
+  }, [auditEvents]);
+
   const performance = useMemo(() => {
     const stats = {};
-    auditEvents.forEach((entry) => {
+    recentAnalyticsEvents.forEach((entry) => {
       if (!stats[entry.actor]) stats[entry.actor] = 0;
       // Count any move / status transition actions as "activity"
       if (typeof entry.action === 'string' && entry.action.startsWith('moved')) {
@@ -323,10 +331,10 @@ export default function ManagerPage() {
       }
     });
     return Object.entries(stats).map(([actor, moved]) => ({ actor, moved }));
-  }, [auditEvents]);
+  }, [recentAnalyticsEvents]);
 
   const frontlineReadyMovesByUser = useMemo(() => {
-    const counts = auditEvents.reduce((acc, entry) => {
+    const counts = recentAnalyticsEvents.reduce((acc, entry) => {
       const action = String(entry.action || '');
       if (!action.includes(`to ${FINAL_STATUS}`)) return acc;
       const actor = entry.actor || 'unknown';
@@ -337,7 +345,7 @@ export default function ManagerPage() {
     return Object.entries(counts)
       .map(([actor, count]) => ({ actor, count }))
       .sort((a, b) => b.count - a.count || a.actor.localeCompare(b.actor));
-  }, [auditEvents]);
+  }, [recentAnalyticsEvents]);
 
   const onSaveSlaHours = (status, value) => {
     const parsed = Number(value);
@@ -704,6 +712,10 @@ export default function ManagerPage() {
 
       <section style={{ marginTop: '1rem', padding: '1rem', background: '#fff', borderRadius: '0.75rem', border: '1px solid #d1d5db' }}>
         <h3>Activity Analytics</h3>
+        <p style={{ margin: '0.25rem 0 0.75rem', color: '#6b7280', fontSize: '0.9rem' }}>
+          Records older than {AUDIT_RETENTION_DAYS} days are automatically pruned.
+          {auditLastPruned && <span> Last cleaned: {new Date(auditLastPruned).toLocaleString()}.</span>}
+        </p>
         <div style={{ margin: '0.35rem 0 0.75rem' }}>
           <p style={{ margin: 0, color: '#065f46', fontWeight: 600 }}>Frontline Ready Moves By User</p>
           {frontlineReadyMovesByUser.length === 0 ? (
@@ -730,8 +742,6 @@ export default function ManagerPage() {
       <AuditLog
         entries={auditEvents}
         lastPruned={auditLastPruned}
-        lastUpdated={lastUpdated.audit}
-        frontlineReadyMovesByUser={frontlineReadyMovesByUser}
         onExport={exportAuditCsv}
         sectionId="audit-log-section"
         onPrint={printAuditLog}

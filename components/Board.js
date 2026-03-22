@@ -61,6 +61,7 @@ export default function Board() {
   const [users, setUsers] = useState(defaultUsers);
   const [stageSlaHours, setStageSlaHours] = useState(defaultStageSlaHours);
   const [syncHealth, setSyncHealth] = useState(getSyncHealthSnapshot());
+  const [viewport, setViewport] = useState('desktop');
 
   useEffect(() => {
     let mounted = true;
@@ -120,6 +121,30 @@ export default function Board() {
 
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const getViewport = () => {
+      if (window.matchMedia('(max-width: 767px)').matches) return 'mobile';
+      if (window.matchMedia('(max-width: 1180px)').matches) return 'tablet';
+      return 'desktop';
+    };
+
+    const updateViewport = () => {
+      setViewport(getViewport());
+    };
+
+    updateViewport();
+
+    const mobileQuery = window.matchMedia('(max-width: 767px)');
+    const tabletQuery = window.matchMedia('(max-width: 1180px)');
+    mobileQuery.addEventListener('change', updateViewport);
+    tabletQuery.addEventListener('change', updateViewport);
+
+    return () => {
+      mobileQuery.removeEventListener('change', updateViewport);
+      tabletQuery.removeEventListener('change', updateViewport);
     };
   }, []);
 
@@ -310,6 +335,9 @@ export default function Board() {
 
   const normalVehicles = filtered.filter((v) => statuses.includes(v.status));
   const quickCleanVehicles = filtered.filter((v) => v.status === QUICK_CLEAN_STATUS);
+  const isMobile = viewport === 'mobile';
+  const isTablet = viewport === 'tablet';
+  const boardColumns = isMobile ? 1 : isTablet ? 3 : statuses.length;
 
   if (loadingUser) {
     return <p>Checking login status...</p>;
@@ -384,8 +412,8 @@ export default function Board() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: `repeat(${statuses.length}, minmax(0, 1fr))`,
-          gap: '0.7rem',
+          gridTemplateColumns: `repeat(${boardColumns}, minmax(0, 1fr))`,
+          gap: isMobile ? '0.85rem' : '0.7rem',
           alignItems: 'start',
           width: '100%',
         }}
@@ -404,6 +432,7 @@ export default function Board() {
               onNext={handleNext}
               onDelete={isManager ? handleDelete : null}
               onUpdateNotes={handleUpdateNotes}
+              compact={isMobile || isTablet}
             />
           );
         })}
@@ -422,6 +451,7 @@ export default function Board() {
           onUpdateNotes={handleUpdateNotes}
           variant="quick-clean"
           emptyLabel="Drag vehicles from New Inventory Received when they need a quick clean"
+          compact={isMobile}
         />
       </div>
     </section>
