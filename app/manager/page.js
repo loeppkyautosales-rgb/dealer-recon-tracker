@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, managerSetUserPassword } from '../../lib/auth';
-import { statuses } from '../../lib/statuses';
+import { FINAL_STATUS, statuses } from '../../lib/statuses';
 import { STORAGE_KEYS, loadAuditLastPruned, loadUsers, saveUsers, saveVehicles } from '../../lib/persistence';
 import { formatWeeksDaysHours, toMs } from '../../lib/time';
 import {
@@ -325,6 +325,13 @@ export default function ManagerPage() {
     return Object.entries(stats).map(([actor, moved]) => ({ actor, moved }));
   }, [auditEvents]);
 
+  const frontlineReadyMoves = useMemo(() => {
+    return auditEvents.filter((entry) => {
+      const action = String(entry.action || '');
+      return action.includes(`to ${FINAL_STATUS}`);
+    }).length;
+  }, [auditEvents]);
+
   const onSaveSlaHours = (status, value) => {
     const parsed = Number(value);
     const safe = Number.isFinite(parsed) && parsed >= 1 ? parsed : 1;
@@ -370,7 +377,7 @@ export default function ManagerPage() {
       return t && now - t <= oneWeekMs;
     });
 
-    const completed = vehicles.filter((v) => v.status === 'Recon Complete' && v.createdAt && v.completedAt);
+    const completed = vehicles.filter((v) => v.status === FINAL_STATUS && v.createdAt && v.completedAt);
     const durations = completed.map((v) => Math.max(0, (toMs(v.completedAt) || 0) - (toMs(v.createdAt) || 0))).filter((d) => d > 0);
     const avgCompletion = durations.length ? formatWeeksDaysHours(durations.reduce((a, b) => a + b, 0) / durations.length) : 'N/A';
 
@@ -690,6 +697,7 @@ export default function ManagerPage() {
 
       <section style={{ marginTop: '1rem', padding: '1rem', background: '#fff', borderRadius: '0.75rem', border: '1px solid #d1d5db' }}>
         <h3>Activity Analytics</h3>
+        <p style={{ margin: '0.35rem 0 0.75rem', color: '#065f46' }}>Frontline Ready Moves: {frontlineReadyMoves}</p>
         {performance.length === 0 ? (
           <p>No activity yet</p>
         ) : (
@@ -705,6 +713,7 @@ export default function ManagerPage() {
         entries={auditEvents}
         lastPruned={auditLastPruned}
         lastUpdated={lastUpdated.audit}
+        frontlineReadyMoves={frontlineReadyMoves}
         onExport={exportAuditCsv}
         sectionId="audit-log-section"
         onPrint={printAuditLog}

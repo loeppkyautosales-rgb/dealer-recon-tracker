@@ -1,6 +1,14 @@
 'use client';
 
-export default function AuditLog({ entries, lastPruned, onPrint, onExport, lastUpdated, sectionId = 'audit-log' }) {
+export default function AuditLog({
+  entries,
+  lastPruned,
+  onPrint,
+  onExport,
+  lastUpdated,
+  frontlineReadyMoves = 0,
+  sectionId = 'audit-log',
+}) {
   if (!entries || entries.length === 0) {
     return <div style={{ marginTop: '1.5rem' }}>No audit events yet.</div>;
   }
@@ -38,6 +46,9 @@ export default function AuditLog({ entries, lastPruned, onPrint, onExport, lastU
         {lastUpdated && (
           <span> Last updated: {new Date(lastUpdated).toLocaleString()}.</span>
         )}
+      </p>
+      <p style={{ margin: '0.2rem 0 0.5rem', color: '#065f46', fontSize: '0.88rem', fontWeight: 600 }}>
+        Frontline Ready Moves: {frontlineReadyMoves}
       </p>
       <ul style={{ maxHeight: '260px', overflowY: 'auto', padding: 0, margin: 0, listStyle: 'none' }}>
         {entries.map((entry, idx) => {

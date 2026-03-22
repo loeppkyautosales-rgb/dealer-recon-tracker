@@ -17,7 +17,7 @@ export default function AddVehicle({ onAdd }) {
       model,
       year,
       color,
-      status: 'New Arrivals',
+      status: 'New Inventory Received',
       notes: '',
     });
 

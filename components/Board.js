@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { statuses } from '../lib/statuses';
+import { FINAL_STATUS, normalizeStatus, QUICK_CLEAN_STATUS, statuses } from '../lib/statuses';
 import { loadUsers, saveVehicles, STORAGE_KEYS } from '../lib/persistence';
 import {
   appendAuditEventShared,
@@ -28,6 +28,18 @@ const defaultUsers = [
   { id: 'u5', email: 'loeppky2001@protonmail.com', role: 'manager' },
 ];
 const defaultStageSlaHours = Object.fromEntries(statuses.map((s) => [s, 72]));
+const QUICK_CLEAN_LIMIT_HOURS = 24;
+
+function normalizeVehicle(vehicle) {
+  const createdAt = vehicle.createdAt || new Date().toISOString();
+  const stageEnteredAt = vehicle.stageEnteredAt || createdAt;
+  return {
+    ...vehicle,
+    status: normalizeStatus(vehicle.status),
+    createdAt,
+    stageEnteredAt,
+  };
+}
 
 function mergeUsers(defaultList, storedList) {
   const map = new Map(defaultList.map((u) => [u.email.toLowerCase(), { ...u }]));
@@ -63,7 +75,8 @@ export default function Board() {
       ]);
 
       if (!mounted) return;
-      setVehicles(nextVehicles || []);
+      const normalizedVehicles = (nextVehicles || []).map(normalizeVehicle);
+      setVehicles(normalizedVehicles);
       setStageSlaHours({ ...defaultStageSlaHours, ...(nextSla || {}) });
       refreshSyncBadge();
     };
@@ -129,6 +142,7 @@ export default function Board() {
     const newItem = {
       ...newVehicle,
       id: crypto.randomUUID(),
+      status: normalizeStatus(newVehicle.status),
       createdAt: nowIso,
       stageEnteredAt: nowIso,
     };
@@ -170,7 +184,9 @@ export default function Board() {
     const updates = {
       status: targetStatus,
       stageEnteredAt: nowIso,
-      completedAt: targetStatus === 'Recon Complete' ? (movedVehicle.completedAt || nowIso) : movedVehicle.completedAt,
+      completedAt: targetStatus === FINAL_STATUS
+        ? (movedVehicle.completedAt || nowIso)
+        : (movedVehicle.status === FINAL_STATUS ? null : movedVehicle.completedAt),
     };
 
     setVehicles((prev) => {
@@ -210,7 +226,9 @@ export default function Board() {
     const updates = {
       status: nextStatus,
       stageEnteredAt: nowIso,
-      completedAt: nextStatus === 'Recon Complete' ? (current.completedAt || nowIso) : current.completedAt,
+      completedAt: nextStatus === FINAL_STATUS
+        ? (current.completedAt || nowIso)
+        : (current.status === FINAL_STATUS ? null : current.completedAt),
     };
 
     setVehicles((prev) => {
@@ -247,11 +265,14 @@ export default function Board() {
     setSyncHealth(getSyncHealthSnapshot());
   };
 
-  const handleDelete = async (id) => {
-    if (!isManager) return;
+  const handleDelete = async (id, options = {}) => {
+    const target = vehicles.find((v) => v.id === id);
+    if (!target) return;
 
-    const deleted = vehicles.find((v) => v.id === id);
-    if (!deleted) return;
+    const canDelete = isManager || options.allowAnyRole === true || target.status === QUICK_CLEAN_STATUS;
+    if (!canDelete) return;
+
+    const deleted = target;
 
     setVehicles((prev) => {
       const next = prev.filter((v) => v.id !== id);
@@ -277,6 +298,9 @@ export default function Board() {
     await signOut();
     setUser(null);
   };
+
+  const normalVehicles = filtered.filter((v) => statuses.includes(v.status));
+  const quickCleanVehicles = filtered.filter((v) => v.status === QUICK_CLEAN_STATUS);
 
   if (loadingUser) {
     return <p>Checking login status...</p>;
@@ -356,7 +380,7 @@ export default function Board() {
         }}
       >
         {statuses.map((status) => {
-          const boardVehicles = filtered.filter((v) => v.status === status);
+          const boardVehicles = normalVehicles.filter((v) => v.status === status);
           return (
             <Column
               key={status}
@@ -372,6 +396,22 @@ export default function Board() {
             />
           );
         })}
+      </div>
+
+      <div style={{ marginTop: '1rem' }}>
+        <Column
+          status={QUICK_CLEAN_STATUS}
+          vehicles={quickCleanVehicles}
+          stageLimitHours={QUICK_CLEAN_LIMIT_HOURS}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={handleDrop}
+          onDragStart={handleDragStart}
+          onNext={null}
+          onDelete={(id) => handleDelete(id, { allowAnyRole: true })}
+          onUpdateNotes={handleUpdateNotes}
+          variant="quick-clean"
+          emptyLabel="Drag vehicles from New Inventory Received when they need a quick clean"
+        />
       </div>
     </section>
   );

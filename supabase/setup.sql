@@ -74,11 +74,12 @@ with check (organization_id = 'default-org');
 -- Seed default SLA values.
 insert into public.recon_stage_sla_targets (organization_id, status, target_hours)
 values
-  ('default-org', 'New Arrivals', 72),
-  ('default-org', 'Pending Safety', 72),
-  ('default-org', 'Ready For Recon', 72),
-  ('default-org', 'Recon In Progress', 72),
-  ('default-org', 'Recon Complete', 72)
+  ('default-org', 'New Inventory Received', 72),
+  ('default-org', 'Pending Inspection', 72),
+  ('default-org', 'Awaiting Parts', 72),
+  ('default-org', 'Approved for Reconditioning', 72),
+  ('default-org', 'Reconditioning in Progress', 72),
+  ('default-org', 'Frontline Ready', 72)
 on conflict (organization_id, status) do update
 set target_hours = excluded.target_hours,
     updated_at = now();

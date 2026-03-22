@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react';
 import { formatDaysHours, toMs } from '../lib/time';
 
-export default function VehicleCard({ vehicle, onDragStart, onAction, onDelete, onUpdateNotes, stageLimitHours = 72 }) {
+export default function VehicleCard({
+  vehicle,
+  onDragStart,
+  onAction,
+  onDelete,
+  onUpdateNotes,
+  stageLimitHours = 72,
+  actionLabel = 'Next Stage',
+}) {
   const [expanded, setExpanded] = useState(false);
   const [notes, setNotes] = useState(vehicle.notes || '');
   const [saveTimer, setSaveTimer] = useState(null);
@@ -97,7 +105,7 @@ export default function VehicleCard({ vehicle, onDragStart, onAction, onDelete, 
             onClick={() => onAction(vehicle.id)}
             style={{ width: '100%', border: '1px solid #0b76f6', background: '#0b76f6', color: 'white', padding: '0.4rem', borderRadius: '0.3rem' }}
           >
-            Next Stage
+            {actionLabel}
           </button>
         )}
         {onDelete && (

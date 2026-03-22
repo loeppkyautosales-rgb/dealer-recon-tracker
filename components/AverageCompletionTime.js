@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { fetchVehiclesShared, subscribeSharedChanges } from '../lib/sharedData';
+import { FINAL_STATUS } from '../lib/statuses';
 import { formatWeeksDaysHours, toMs } from '../lib/time';
 import { supabase } from '../lib/supabaseClient';
 
@@ -41,7 +42,7 @@ export default function AverageCompletionTime() {
     const twoWeeksMs = 14 * 24 * 60 * 60 * 1000;
     const now = Date.now();
     const completed = vehicles.filter((v) => {
-      if (v.status !== 'Recon Complete' || !v.createdAt || !v.completedAt) return false;
+      if (v.status !== FINAL_STATUS || !v.createdAt || !v.completedAt) return false;
       const completedAtMs = toMs(v.completedAt);
       if (!completedAtMs) return false;
       return now - completedAtMs <= twoWeeksMs;
