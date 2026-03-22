@@ -20,6 +20,9 @@ create table if not exists public.recon_vehicles (
   updated_at timestamptz not null default now()
 );
 
+alter table public.recon_vehicles
+add column if not exists stage_elapsed_ms jsonb not null default '{}'::jsonb;
+
 create index if not exists idx_recon_vehicles_org on public.recon_vehicles (organization_id);
 create index if not exists idx_recon_vehicles_status on public.recon_vehicles (status);
 create index if not exists idx_recon_vehicles_created_at on public.recon_vehicles (created_at desc);

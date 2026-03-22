@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { formatDaysHours, toMs } from '../lib/time';
+import { formatDaysHours, getCurrentStageElapsedMs, toMs } from '../lib/time';
 
 export default function VehicleCard({
   vehicle,
@@ -45,9 +45,8 @@ export default function VehicleCard({
   };
 
   const createdAtMs = toMs(vehicle.createdAt) || now;
-  const stageEnteredAtMs = toMs(vehicle.stageEnteredAt) || createdAtMs;
   const totalElapsedMs = Math.max(0, now - createdAtMs);
-  const stageElapsedMs = Math.max(0, now - stageEnteredAtMs);
+  const stageElapsedMs = getCurrentStageElapsedMs(vehicle, now);
   const totalElapsedLabel = formatDaysHours(totalElapsedMs);
   const stageElapsedLabel = formatDaysHours(stageElapsedMs);
   const isStageOverdue = stageLimitHours > 0 && stageElapsedMs > stageLimitHours * 60 * 60 * 1000;

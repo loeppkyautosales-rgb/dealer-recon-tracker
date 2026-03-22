@@ -325,11 +325,18 @@ export default function ManagerPage() {
     return Object.entries(stats).map(([actor, moved]) => ({ actor, moved }));
   }, [auditEvents]);
 
-  const frontlineReadyMoves = useMemo(() => {
-    return auditEvents.filter((entry) => {
+  const frontlineReadyMovesByUser = useMemo(() => {
+    const counts = auditEvents.reduce((acc, entry) => {
       const action = String(entry.action || '');
-      return action.includes(`to ${FINAL_STATUS}`);
-    }).length;
+      if (!action.includes(`to ${FINAL_STATUS}`)) return acc;
+      const actor = entry.actor || 'unknown';
+      acc[actor] = (acc[actor] || 0) + 1;
+      return acc;
+    }, {});
+
+    return Object.entries(counts)
+      .map(([actor, count]) => ({ actor, count }))
+      .sort((a, b) => b.count - a.count || a.actor.localeCompare(b.actor));
   }, [auditEvents]);
 
   const onSaveSlaHours = (status, value) => {
@@ -697,7 +704,18 @@ export default function ManagerPage() {
 
       <section style={{ marginTop: '1rem', padding: '1rem', background: '#fff', borderRadius: '0.75rem', border: '1px solid #d1d5db' }}>
         <h3>Activity Analytics</h3>
-        <p style={{ margin: '0.35rem 0 0.75rem', color: '#065f46' }}>Frontline Ready Moves: {frontlineReadyMoves}</p>
+        <div style={{ margin: '0.35rem 0 0.75rem' }}>
+          <p style={{ margin: 0, color: '#065f46', fontWeight: 600 }}>Frontline Ready Moves By User</p>
+          {frontlineReadyMovesByUser.length === 0 ? (
+            <p style={{ margin: '0.25rem 0 0', color: '#6b7280' }}>No Frontline Ready moves yet</p>
+          ) : (
+            <ul style={{ listStyle: 'none', padding: 0, margin: '0.35rem 0 0' }}>
+              {frontlineReadyMovesByUser.map((entry) => (
+                <li key={entry.actor}>{entry.actor}: {entry.count}</li>
+              ))}
+            </ul>
+          )}
+        </div>
         {performance.length === 0 ? (
           <p>No activity yet</p>
         ) : (
@@ -713,7 +731,7 @@ export default function ManagerPage() {
         entries={auditEvents}
         lastPruned={auditLastPruned}
         lastUpdated={lastUpdated.audit}
-        frontlineReadyMoves={frontlineReadyMoves}
+        frontlineReadyMovesByUser={frontlineReadyMovesByUser}
         onExport={exportAuditCsv}
         sectionId="audit-log-section"
         onPrint={printAuditLog}

@@ -1,4 +1,5 @@
 import VehicleCard from './VehicleCard';
+import { getCurrentStageElapsedMs } from '../lib/time';
 
 export default function Column({
   status,
@@ -15,10 +16,8 @@ export default function Column({
   actionLabel = 'Next Stage',
 }) {
   const overdueCount = vehicles.filter((v) => {
-    if (!v.stageEnteredAt || !stageLimitHours) return false;
-    const ms = new Date(v.stageEnteredAt).getTime();
-    if (!Number.isFinite(ms)) return false;
-    return Date.now() - ms > stageLimitHours * 60 * 60 * 1000;
+    if (!stageLimitHours) return false;
+    return getCurrentStageElapsedMs(v) > stageLimitHours * 60 * 60 * 1000;
   }).length;
 
   const isQuickClean = variant === 'quick-clean';

@@ -6,7 +6,7 @@ export default function AuditLog({
   onPrint,
   onExport,
   lastUpdated,
-  frontlineReadyMoves = 0,
+  frontlineReadyMovesByUser = [],
   sectionId = 'audit-log',
 }) {
   if (!entries || entries.length === 0) {
@@ -47,9 +47,30 @@ export default function AuditLog({
           <span> Last updated: {new Date(lastUpdated).toLocaleString()}.</span>
         )}
       </p>
-      <p style={{ margin: '0.2rem 0 0.5rem', color: '#065f46', fontSize: '0.88rem', fontWeight: 600 }}>
-        Frontline Ready Moves: {frontlineReadyMoves}
-      </p>
+      <div style={{ margin: '0.35rem 0 0.65rem' }}>
+        <p style={{ margin: 0, color: '#065f46', fontSize: '0.88rem', fontWeight: 600 }}>Frontline Ready Moves By User</p>
+        {frontlineReadyMovesByUser.length === 0 ? (
+          <p style={{ margin: '0.2rem 0 0', color: '#6b7280', fontSize: '0.84rem' }}>No Frontline Ready moves recorded yet.</p>
+        ) : (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.35rem' }}>
+            {frontlineReadyMovesByUser.map((entry) => (
+              <span
+                key={entry.actor}
+                style={{
+                  fontSize: '0.8rem',
+                  color: '#065f46',
+                  background: '#dcfce7',
+                  border: '1px solid #86efac',
+                  borderRadius: '999px',
+                  padding: '0.2rem 0.55rem',
+                }}
+              >
+                {entry.actor}: {entry.count}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
       <ul style={{ maxHeight: '260px', overflowY: 'auto', padding: 0, margin: 0, listStyle: 'none' }}>
         {entries.map((entry, idx) => {
           const vehicleLabel = entry.stockNumber

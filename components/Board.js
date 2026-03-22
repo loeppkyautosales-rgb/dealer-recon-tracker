@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { FINAL_STATUS, normalizeStatus, QUICK_CLEAN_STATUS, statuses } from '../lib/statuses';
 import { loadUsers, saveVehicles, STORAGE_KEYS } from '../lib/persistence';
+import { accumulateStageElapsed, sanitizeStageElapsedMap } from '../lib/time';
 import {
   appendAuditEventShared,
   createVehicleShared,
@@ -38,6 +39,7 @@ function normalizeVehicle(vehicle) {
     status: normalizeStatus(vehicle.status),
     createdAt,
     stageEnteredAt,
+    stageElapsedMs: sanitizeStageElapsedMap(vehicle.stageElapsedMs),
   };
 }
 
@@ -145,6 +147,7 @@ export default function Board() {
       status: normalizeStatus(newVehicle.status),
       createdAt: nowIso,
       stageEnteredAt: nowIso,
+      stageElapsedMs: {},
     };
     setVehicles((prev) => {
       const next = [newItem, ...prev];
@@ -180,10 +183,13 @@ export default function Board() {
     if (movedVehicle.status === targetStatus) return;
 
     const nowIso = new Date().toISOString();
+    const nowMs = Date.now();
     const from = movedVehicle.status;
+    const nextStageElapsedMs = accumulateStageElapsed(movedVehicle, nowMs);
     const updates = {
       status: targetStatus,
       stageEnteredAt: nowIso,
+      stageElapsedMs: nextStageElapsedMs,
       completedAt: targetStatus === FINAL_STATUS
         ? (movedVehicle.completedAt || nowIso)
         : (movedVehicle.status === FINAL_STATUS ? null : movedVehicle.completedAt),
@@ -222,10 +228,13 @@ export default function Board() {
     if (index === -1 || index === statuses.length - 1) return;
 
     const nowIso = new Date().toISOString();
+    const nowMs = Date.now();
     const nextStatus = statuses[index + 1];
+    const nextStageElapsedMs = accumulateStageElapsed(current, nowMs);
     const updates = {
       status: nextStatus,
       stageEnteredAt: nowIso,
+      stageElapsedMs: nextStageElapsedMs,
       completedAt: nextStatus === FINAL_STATUS
         ? (current.completedAt || nowIso)
         : (current.status === FINAL_STATUS ? null : current.completedAt),
@@ -373,10 +382,13 @@ export default function Board() {
       <SearchBar value={searchText} onChange={setSearchText} />
 
       <div
-        className="grid"
         style={{
-          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          display: 'grid',
+          gridTemplateColumns: `repeat(${statuses.length}, minmax(270px, 1fr))`,
           gap: '1rem',
+          overflowX: 'auto',
+          alignItems: 'start',
+          paddingBottom: '0.25rem',
         }}
       >
         {statuses.map((status) => {
