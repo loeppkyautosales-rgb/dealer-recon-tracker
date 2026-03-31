@@ -26,6 +26,13 @@ const defaultUsers = [
   { id: 'u3', email: 'loeppky22@gmail.com', role: 'manager' },
   { id: 'u4', email: 'vinceloeppky@hotmail.com', role: 'manager' },
   { id: 'u5', email: 'loeppky2001@protonmail.com', role: 'manager' },
+  { id: 'u6', email: 'alexkaridze@gmail.com', role: 'user' },
+  { id: 'u7', email: 'sericman89@gmail.com', role: 'user' },
+  { id: 'u8', email: 'boileau.jd@gmail.com', role: 'user' },
+  { id: 'u9', email: 'aidynabigaliyev@gmail.com', role: 'user' },
+  { id: 'u10', email: 'dafxf1780@gmail.com', role: 'user' },
+  { id: 'u11', email: 'sawyer.thiesen12@gmail.com', role: 'manager' },
+  { id: 'u12', email: 'taylorfriesen08@gmail.com', role: 'manager' },
 ];
 
 const initialVehicles = [];
