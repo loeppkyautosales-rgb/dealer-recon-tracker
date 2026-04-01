@@ -31,7 +31,7 @@ const defaultUsers = [
   { id: 'u8', email: 'boileau.jd@gmail.com', role: 'user' },
   { id: 'u9', email: 'aidynabigaliyev@gmail.com', role: 'user' },
   { id: 'u10', email: 'dafxf1780@gmail.com', role: 'user' },
-  { id: 'u11', email: 'sawyer.thiesen12@gmail.com', role: 'manager' },
+  { id: 'u11', email: 'sawyer.thiessen12@gmail.com', role: 'manager' },
   { id: 'u12', email: 'taylorfriesen08@gmail.com', role: 'manager' },
 ];
 
